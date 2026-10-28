@@ -5,7 +5,6 @@
 #include <vector>
 #include <stdexcept>
 
-#include "AntiDebug.h"
 #include "LogHelper.h"
 #include "LicenseHelper.h"
 #include "Config.h"
@@ -83,7 +82,6 @@ ServiceHost::ServiceHost()
     EnsureEventSource();
 
     License::Initialize();
-    AntiDebug::Checkpoint("ServiceInit");
 }
 
 ServiceHost::~ServiceHost()
@@ -240,7 +238,6 @@ void ServiceHost::OnStart()
             return;
         }
 
-        AntiDebug::Checkpoint("ServiceStart");
 
         std::vector<PrinterConfig> configs = ConfigHelper::GetPrinterConfigs();
         if (configs.empty())

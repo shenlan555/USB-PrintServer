@@ -19,7 +19,7 @@ namespace BuildConfig
     inline constexpr const char* Description = "将本地打印机共享为网络打印机的服务程序";
 
     // ===== 授权总开关 =====
-    // 开源免费版：授权系统整体关闭（LicenseHelper / AntiDebug / LicenseDlg 均被短路），
+    // 开源免费版：授权系统已整体移除（LicenseHelper 被短路，反调试惩罚模块已删除），
     // 程序启动即视为已授权，不再联网验证、不再生成 license.dat、不再执行反调试惩罚。
     // 如需恢复商业授权，改回 true 并填写下方密钥后重新编译。
     inline constexpr bool LicenseEnabled = false;
