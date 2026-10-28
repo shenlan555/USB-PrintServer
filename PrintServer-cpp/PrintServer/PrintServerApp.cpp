@@ -5,7 +5,6 @@
 #include "ServiceHost.h"
 #include "Program.h"
 #include "LicenseHelper.h"
-#include "LicenseDlg.h"
 #include "PrintServerDlg.h"
 #include "LogHelper.h"
 #include "Config.h"
@@ -42,43 +41,9 @@ std::wstring ToLowerInvariant(const std::wstring& text)
     return result;
 }
 
-// 对应 C# Program.CheckLicense()
-// 修复Bug1：license.dat 不存在时跳过联网验证，强制弹出授权窗口
+// 开源免费版：无授权门禁，恒通过（原 CheckLicense 已随授权系统移除）
 bool CheckLicense()
 {
-    if (!ps::License::HasLocalLicenseFile())
-    {
-        ps::License::ForceLicenseReactivation();
-
-        ps::CLicenseDlg licenseDlg;
-        if (licenseDlg.DoModal() != IDOK)
-            return false;
-
-        if (ps::License::CurrentStatus() != ps::License::Status::Licensed)
-        {
-            ::MessageBoxW(nullptr, L"授权验证失败，程序无法启动", L"授权失败",
-                          MB_OK | MB_ICONERROR);
-            return false;
-        }
-    }
-    else
-    {
-        // license.dat 存在，正常联网验证
-        if (!ps::License::StartValidation())
-        {
-            ps::CLicenseDlg licenseDlg;
-            if (licenseDlg.DoModal() != IDOK)
-                return false;
-
-            if (ps::License::CurrentStatus() != ps::License::Status::Licensed)
-            {
-                ::MessageBoxW(nullptr, L"授权验证失败，程序无法启动", L"授权失败",
-                              MB_OK | MB_ICONERROR);
-                return false;
-            }
-        }
-    }
-
     return true;
 }
 
@@ -182,24 +147,8 @@ BOOL CPrintServerApp::InitInstance()
             return FALSE;
         }
 
-        // 用法: PrintServer.exe /tlstest [报告文件]
-        if (EqualsIgnoreCase(command, L"/tlstest"))
-        {
-            std::wstring report = (args.size() >= 2) ? args[1] : L"";
-            if (report.empty())
-            {
-                wchar_t temp[MAX_PATH] = { 0 };
-                ::GetTempPathW(MAX_PATH, temp);
-                report = std::wstring(temp) + L"tls_selftest_report.txt";
-            }
-
-            ps::RunTlsSelfTest(report);
-            return FALSE;
-        }
-
-        // 用法: PrintServer.exe /guitest [license]
-        // 免提权直接打开界面，仅用于界面录制与视觉核对；
-        // 带 license 参数时打开授权窗口（跳过提权与授权门禁）
+        // 用法: PrintServer.exe /guitest
+        // 免提权直接打开界面，仅用于界面录制与视觉核对（跳过提权）
         if (EqualsIgnoreCase(command, L"/guitest"))
         {
             INITCOMMONCONTROLSEX controls = { 0 };
@@ -209,14 +158,6 @@ BOOL CPrintServerApp::InitInstance()
             ::InitCommonControlsEx(&controls);
 
             ps::License::Initialize();
-
-            if (args.size() >= 2 && EqualsIgnoreCase(args[1], L"license"))
-            {
-                ps::CLicenseDlg licenseDialog;
-                m_pMainWnd = &licenseDialog;
-                licenseDialog.DoModal();
-                return FALSE;
-            }
 
             ps::CPrintServerDlg dialog;
             m_pMainWnd = &dialog;

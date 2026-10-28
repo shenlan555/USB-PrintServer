@@ -2,7 +2,6 @@
 #include "CryptoSelfTest.h"
 #include "Crypto.h"
 #include "BuildConfig.h"
-#include "MachineCode.h"
 #include "Config.h"
 #include "Json.h"
 #include "PrintService.h"
@@ -10,7 +9,6 @@
 #include "ServiceHost.h"
 #include "LogHelper.h"
 #include "LicenseHelper.h"
-#include "TlsTrust.h"
 
 #include <winhttp.h>
 #include <winsock2.h>
@@ -224,23 +222,6 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
               Crypto::DecryptLicenseFile(aesCs, Crypto::GenerateHmacSignature(aesCs, secret), secret),
               aesPlain);
 
-        // ---------------- 硬件指纹 / 机器码 ----------------
-        append("\r\n---- 机器码 ----\r\n");
-
-        std::string macCpp     = MachineCode::GetPhysicalMac();
-        std::string cpuIdCpp   = MachineCode::GetCpuId();
-        std::string boardSnCpp = MachineCode::GetMotherboardSerial();
-        std::string diskSnCpp  = MachineCode::GetSystemDiskSerial();
-
-        // 逐个硬件项先比对，便于定位差异来源
-        check("cpu_id", cpuIdCpp, Get(v, "cpu_id_cs"));
-        check("motherboard_sn", boardSnCpp, Get(v, "motherboard_sn_cs"));
-        check("disk_sn", diskSnCpp, Get(v, "disk_sn_cs"));
-        check("mac_address", macCpp, Get(v, "mac_cs"));
-
-        // 最终机器码
-        check("machine_code", MachineCode::GenerateMachineCode(), Get(v, "machine_code_cs"));
-
         // ---------------- App.config 读取 ----------------
         append("\r\n---- 配置读取（App.config）----\r\n");
         check("PrinterCount", Config::GetSetting("PrinterCount", "(缺失)"), "0");
@@ -273,10 +254,6 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
               Get(v, "lic_key_expected"));
         check("lic expires_at", licExpNode ? licExpNode->ToConvertString() : "(缺失)",
               Get(v, "lic_expires_expected"));
-        check("lic machine_code 与本机一致",
-              licMcNode ? licMcNode->ToConvertString() : std::string(),
-              MachineCode::GenerateMachineCode());
-
         // 3) 签名被篡改必须拒绝
         check("lic 篡改签名被拒绝",
               Crypto::DecryptLicenseFile(licData, licSigTampered, secret).empty() ? "rejected" : "accepted",
@@ -906,120 +883,6 @@ int RunServiceSelfTest(const std::wstring& reportPath)
     return failed;
 }
 
-// ===========================================================================
-// 授权 HTTPS 证书链自测
-//
-// 重点验证 Windows 7 未更新根证书库（未装 TLS 补丁）时授权链路仍然可用：
-// 内嵌根证书必须足以独立完成服务器证书的链校验，同时不能放行
-// 其它根签发或主机名不符的证书。
-// ===========================================================================
-int RunTlsSelfTest(const std::wstring& reportPath)
-{
-    std::string report;
-    int failed = 0;
-
-    auto append = [&report](const char* fmt, ...) {
-        char buf[2048];
-        va_list args;
-        va_start(args, fmt);
-        _vsnprintf_s(buf, sizeof(buf), _TRUNCATE, fmt, args);
-        va_end(args);
-        report += buf;
-    };
-
-    auto check = [&](const char* name, bool pass) {
-        if (!pass)
-            ++failed;
-        append("[%s] %s\r\n", pass ? "PASS" : "FAIL", name);
-    };
-
-    const std::wstring host = L"ps.itlog.vip";
-
-    append("=========== 授权 HTTPS 证书链自检 ===========\r\n\r\n");
-
-    // ---------------- 内嵌根证书 ----------------
-    append("---- 内嵌根证书 ----\r\n");
-    append("内嵌根证书数量: %d\r\n", (int)TlsTrust::EmbeddedRootCount());
-
-    check("内嵌根证书已配置", TlsTrust::EmbeddedRootCount() > 0);
-    check("ISRG Root X1 指纹核对",
-          TlsTrust::EmbeddedRootSha256(0) ==
-          "96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6");
-
-    // ---------------- 服务器证书 ----------------
-    append("\r\n---- 服务器证书 ----\r\n");
-
-    PCCERT_CONTEXT cert = TlsTrust::ProbeServerCertificate(host, 443);
-    check("已取得授权服务器证书", cert != nullptr);
-
-    if (cert != nullptr)
-    {
-        char subject[512] = { 0 };
-        ::CertGetNameStringA(cert, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr,
-                             subject, (DWORD)sizeof(subject));
-        append("证书主题: %s\r\n", subject);
-
-        bool systemTrust = TlsTrust::VerifyWithSystemStoreOnly(cert, host);
-        bool embeddedTrust = TlsTrust::VerifyWithEmbeddedRootOnly(cert, host);
-        append("系统存储校验: %s\r\n", systemTrust ? "通过" : "不通过");
-        append("内嵌根证书校验: %s\r\n", embeddedTrust ? "通过" : "不通过");
-
-        // 核心断言：Win7 缺根证书时依赖的正是这条路径
-        check("内嵌根证书可独立校验服务器证书", embeddedTrust);
-
-        // 主机名不符必须拒绝
-        check("主机名不符必须拒绝",
-              !TlsTrust::VerifyWithEmbeddedRootOnly(cert, L"wrong-host.example.com"));
-
-        ::CertFreeCertificateContext(cert);
-    }
-    else
-    {
-        append("（无法联网取得证书，联网项无法验证）\r\n");
-    }
-
-    // ---------------- 其它 CA 签发的证书必须拒绝 ----------------
-    PCCERT_CONTEXT other = TlsTrust::ProbeServerCertificate(L"www.microsoft.com", 443);
-    if (other != nullptr)
-    {
-        check("其它根签发的证书必须拒绝",
-              !TlsTrust::VerifyWithEmbeddedRootOnly(other, L"www.microsoft.com"));
-        ::CertFreeCertificateContext(other);
-    }
-    else
-    {
-        append("（无法取得对照证书，跳过其它 CA 反例）\r\n");
-    }
-
-    // ---------------- 授权接口端到端 ----------------
-    append("\r\n---- 授权接口（与生产完全相同的 HTTPS 路径）----\r\n");
-
-    std::vector<std::pair<std::string, std::string>> pairs;
-    pairs.push_back(std::make_pair("machine_code", License::MachineCode()));
-    std::string json = License::Internal::BuildJson(pairs);
-    std::string url = std::string(BuildConfig::LicenseUrl) + "validate";
-
-    append("POST %s\r\n", url.c_str());
-    std::string response = License::Internal::HttpPost(url, json, 20);
-    append("响应长度: %d\r\n", (int)response.size());
-    if (!response.empty())
-        append("响应: %s\r\n", response.c_str());
-
-    check("HTTPS 授权接口可用", !response.empty());
-
-    append("\r\n=========== 结果: %s (失败 %d 项) ===========\r\n",
-           failed == 0 ? "全部通过" : "存在失败", failed);
-
-    std::vector<char> out;
-    const unsigned char bom[3] = { 0xEF, 0xBB, 0xBF };
-    out.push_back((char)bom[0]);
-    out.push_back((char)bom[1]);
-    out.push_back((char)bom[2]);
-    out.insert(out.end(), report.begin(), report.end());
-    WriteAllBytes(reportPath, out);
-
-    return failed;
-}
 
 }
 #endif // _DEBUG

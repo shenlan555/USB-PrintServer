@@ -26,8 +26,5 @@ int RunApiSelfTest(const std::wstring& reportPath);
 // 返回 0 表示全部通过。
 int RunServiceSelfTest(const std::wstring& reportPath);
 
-// 授权 HTTPS 证书链自测（内嵌根证书 / 主机名反例 / 授权接口连通性）
-// 返回 0 表示全部通过。
-int RunTlsSelfTest(const std::wstring& reportPath);
 }
 #endif // _DEBUG

@@ -162,10 +162,8 @@
     <ClCompile Include="PrintServerApp.cpp" />
     <ClCompile Include="Json.cpp" />
     <ClCompile Include="Crypto.cpp" />
-    <ClCompile Include="TlsTrust.cpp" />
     <ClCompile Include="CryptoSelfTest.cpp" />
     <ClCompile Include="Wmi.cpp" />
-    <ClCompile Include="MachineCode.cpp" />
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="LogHelper.cpp" />
     <ClCompile Include="ErrorHandler.cpp" />
@@ -184,7 +182,6 @@
     <ClCompile Include="UiTheme.cpp" />
     <ClCompile Include="UiGdiPlus.cpp" />
     <ClCompile Include="UiControls.cpp" />
-    <ClCompile Include="LicenseDlg.cpp" />
     <ClCompile Include="PrintServerDlg.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -195,12 +192,9 @@
     <ClInclude Include="PrintServerApp.h" />
     <ClInclude Include="Json.h" />
     <ClInclude Include="Crypto.h" />
-    <ClInclude Include="TlsTrust.h" />
-    <ClInclude Include="TlsTrustRoots.h" />
     <ClInclude Include="BuildConfig.h" />
     <ClInclude Include="CryptoSelfTest.h" />
     <ClInclude Include="Wmi.h" />
-    <ClInclude Include="MachineCode.h" />
     <ClInclude Include="Config.h" />
     <ClInclude Include="LogHelper.h" />
     <ClInclude Include="ErrorHandler.h" />
@@ -220,7 +214,6 @@
     <ClInclude Include="UiTheme.h" />
     <ClInclude Include="UiGdiPlus.h" />
     <ClInclude Include="UiControls.h" />
-    <ClInclude Include="LicenseDlg.h" />
     <ClInclude Include="PrintServerDlg.h" />
   </ItemGroup>
   <ItemGroup>
