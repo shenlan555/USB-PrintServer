@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }} (x64 Release)
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: PrintServer
+            solution: PrintServer-cpp/PrintServer.sln
+            artifact: PrintServer-x64
+          - target: PrintClient
+            solution: PrintClient-cpp/PrintClient.sln
+            artifact: PrintClient-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 工程使用 v142 工具集（VS2019），GitHub 镜像默认只有 v143，这里单独安装
+      - name: Install v142 toolset
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -latest -products * -property installationPath
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+          Write-Host "VS: $installPath"
+          & $installer modify --installPath "$installPath" `
+            --add Microsoft.VisualStudio.Component.VC.v142.x86.x64 `
+            --quiet --norestart --nocache | Out-Null
+          $exit = $LASTEXITCODE
+          Write-Host "vs_installer exit code: $exit"
+          if ($exit -ne 0 -and $exit -ne 3010) { exit $exit }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          msbuild "${{ matrix.solution }}" `
+            /m /p:Configuration=Release /p:Platform=x64 `
+            /p:PlatformToolset=v142 /p:WindowsTargetPlatformVersion=10.0 `
+            /v:minimal /nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          $bin = Get-ChildItem -Path . -Directory -Recurse -Filter bin |
+                 Where-Object { $_.FullName -match '\\bin$' }
+          foreach ($d in $bin) {
+            Write-Host "bin dir: $($d.FullName)"
+            Get-ChildItem $d.FullName -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+          }
+          $out = "out/${{ matrix.artifact }}"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          # bin/<Platform>/<Configuration>/ 下的 exe 与 pdfium.dll（若有）
+          Get-ChildItem -Path . -Recurse -Include "${{ matrix.target }}.exe" |
+            ForEach-Object { Copy-Item $_.FullName -Destination $out -Force }
+          $dll = Get-ChildItem -Path . -Recurse -Filter pdfium.dll | Select-Object -First 1
+          if ($dll) { Copy-Item $dll.FullName -Destination $out -Force }
+          Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
+          if (-not (Test-Path "$out/${{ matrix.target }}.exe")) {
+            Write-Error "未找到 ${{ matrix.target }}.exe，构建输出缺失"
+            exit 1
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: out/${{ matrix.artifact }}/
+          if-no-files-found: error
