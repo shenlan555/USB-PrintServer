@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build ${{ matrix.target }} (x64 Release)
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     strategy:
       fail-fast: false
@@ -29,7 +29,7 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 工程使用 MFC 静态链接；runner 的 v142 MFC 常缺失，构建时统一用 v143 工具集（源码兼容）
+      # windows-2022 镜像自带 v142 工具集与 MFC；若 MFC 缺失则用 vs_installer 补装
       - name: Install MSVC toolset and MFC
         shell: pwsh
         run: |
@@ -40,10 +40,8 @@ jobs:
           # 依次尝试 v142 MFC + v143 MFC（不同镜像 VS 版本组件 ID 不同）
           $components = @(
             "Microsoft.VisualStudio.Component.VC.v142.x86.x64",
-            "Microsoft.VisualStudio.Component.VC.14.29.x86.x64",
             "Microsoft.VisualStudio.Component.VC.14.29.MFC",
-            "Microsoft.VisualStudio.Component.VC.14.29.ATL",
-            "Microsoft.VisualStudio.Component.VC.ATLMFC"
+            "Microsoft.VisualStudio.Component.VC.14.29.ATL"
           )
           $args = @("modify", "--installPath", "$installPath", "--quiet", "--norestart", "--nocache")
           foreach ($c in $components) { $args += "--add"; $args += $c }
@@ -63,7 +61,7 @@ jobs:
         run: |
           msbuild "${{ matrix.solution }}" `
             /m /p:Configuration=Release /p:Platform=x64 `
-            /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 `
+            /p:PlatformToolset=v142 /p:WindowsTargetPlatformVersion=10.0 `
             /v:minimal /nologo
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
