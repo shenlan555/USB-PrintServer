@@ -7,7 +7,6 @@
 //
 // 启动流程（严格对应 C# OnStart）：
 //   1. LicenseHelper.StartValidation()  → 失败则写事件日志、退出码 1066、停止服务
-//   2. AntiDebug.Checkpoint("ServiceStart")
 //   3. ConfigurationHelper.GetPrinterConfigs() → 为空则写事件日志、退出码 1066、停止服务
 //   4. 每台打印机起一个 TcpPrintServer 线程
 //   5. 启动 HttpApiServer（端口取 App.config 的 ApiPort，默认 9180）

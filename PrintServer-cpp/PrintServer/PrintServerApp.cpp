@@ -4,7 +4,6 @@
 #include "TrayAppContext.h"
 #include "ServiceHost.h"
 #include "Program.h"
-#include "AntiDebug.h"
 #include "LicenseHelper.h"
 #include "LicenseDlg.h"
 #include "PrintServerDlg.h"
@@ -79,9 +78,6 @@ bool CheckLicense()
             }
         }
     }
-
-    // 反调试检测点 2：授权通过后
-    ps::AntiDebug::Checkpoint("AfterLicense");
 
     return true;
 }
@@ -212,7 +208,6 @@ BOOL CPrintServerApp::InitInstance()
                              ICC_PROGRESS_CLASS | ICC_DATE_CLASSES | ICC_BAR_CLASSES;
             ::InitCommonControlsEx(&controls);
 
-            ps::AntiDebug::Initialize();
             ps::License::Initialize();
 
             if (args.size() >= 2 && EqualsIgnoreCase(args[1], L"license"))
@@ -248,12 +243,6 @@ BOOL CPrintServerApp::InitInstance()
     }
 
     // ========== 管理员权限已确认，执行正常流程 ==========
-
-    // 初始化反调试系统（检查注册表黑名单 + 启动守护线程）
-    ps::AntiDebug::Initialize();
-
-    // 反调试检测点 1：程序入口
-    ps::AntiDebug::Checkpoint("MainEntry");
 
     // 初始化授权系统
     ps::License::Initialize();

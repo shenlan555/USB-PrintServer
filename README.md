@@ -38,7 +38,7 @@ print-soft/
 
 1. `PrintServer-cpp/PrintServer/BuildConfig.h` 中新增总开关 `LicenseEnabled = false`：
    - 授权校验（在线/离线激活、定时复验、license.dat 缓存）全部短路，启动即视为已授权；
-   - 反调试/黑名单/惩罚机制（AntiDebug）整体停用，不再对用户环境做任何检测；
+   - 反调试/黑名单/惩罚模块（AntiDebug）已**从工程中整体删除**（源文件与编译项均已移除），程序不再对用户环境做任何检测；
    - 授权服务器地址与授权加密密钥已替换为占位符，不会外联任何服务器。
 2. PHP 授权管理平台（license-server）与密钥归档**不在本仓库中**。
 3. 如需恢复商业授权：把 `LicenseEnabled` 改回 `true`，填写授权服务器地址与密钥，并补回 LicenseHelper 中被短路的分支（原实现代码均已保留）。

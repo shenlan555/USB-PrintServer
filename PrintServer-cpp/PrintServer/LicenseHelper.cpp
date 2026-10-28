@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "LicenseHelper.h"
-#include "AntiDebug.h"
 #include "Crypto.h"
 #include "MachineCode.h"
 #include "LogHelper.h"
@@ -190,7 +189,7 @@ bool WriteTextFileRaw(const std::wstring& path, const std::string& text)
 } // namespace
 
 // ===========================================================================
-// 内部辅助（供 AntiDebug 等调用）
+// 内部辅助
 // ===========================================================================
 
 namespace Internal
@@ -710,14 +709,6 @@ bool ValidateWithServerSync()
 {
     if (!BuildConfig::LicenseEnabled)
         return true; // 免费版：联网校验恒通过
-
-    // 校验前先检查授权系统是否被禁用
-    if (AntiDebug::IsLicenseSystemTampered())
-    {
-        Log::WriteLog("[授权] 检测到授权系统被篡改，执行惩罚");
-        AntiDebug::ForcePenalty();
-        return false;
-    }
 
     std::string url;
     std::string licenseKey;
@@ -1429,19 +1420,9 @@ void OnValidationTimer()
     if (g_isChecking.exchange(true))
         return;
 
-    AntiDebug::Checkpoint("TimerValidation");
-
     bool valid = Internal::ValidateWithServerSync();
     Status status = CurrentStatus();
     Internal::OnStatusChanged(valid ? Status::Licensed : status);
-
-    // 服务端返回禁用或过期 → 立即惩罚
-    if (status == Status::Disabled || status == Status::Expired)
-    {
-        Log::WriteLog("[授权] 服务端返回状态: " + GetStatusText() +
-                      "，授权码: " + CurrentLicenseKey() + "，执行惩罚");
-        AntiDebug::ForcePenalty();
-    }
 
     g_isChecking.store(false);
 }
@@ -1453,8 +1434,6 @@ bool StartValidation()
         Internal::OnStatusChanged(Status::Licensed);
         return true; // 免费版：启动即授权通过，不启动验证定时器
     }
-
-    AntiDebug::Checkpoint("StartValidation");
 
     // 第一次：强制联网校验
     bool valid = Internal::ValidateWithServerSync();

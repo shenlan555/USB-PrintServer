@@ -89,7 +89,7 @@ std::string GetLicenseExpiryText();
 bool IsExpiryNever();
 int GetExpiryRemainingDays();
 
-// ---------------- 内部（供 AntiDebug 等使用） ----------------
+// ---------------- 内部 ----------------
 namespace Internal
 {
     void OnStatusChanged(Status status);

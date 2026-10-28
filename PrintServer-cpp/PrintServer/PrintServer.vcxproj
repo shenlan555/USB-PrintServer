@@ -169,7 +169,6 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="LogHelper.cpp" />
     <ClCompile Include="ErrorHandler.cpp" />
-    <ClCompile Include="AntiDebug.cpp" />
     <ClCompile Include="LicenseHelper.cpp" />
     <ClCompile Include="PrintService.cpp" />
     <ClCompile Include="DriverPackager.cpp" />
@@ -205,7 +204,6 @@
     <ClInclude Include="Config.h" />
     <ClInclude Include="LogHelper.h" />
     <ClInclude Include="ErrorHandler.h" />
-    <ClInclude Include="AntiDebug.h" />
     <ClInclude Include="LicenseHelper.h" />
     <ClInclude Include="PrintService.h" />
     <ClInclude Include="DriverPackager.h" />
