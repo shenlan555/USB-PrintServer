@@ -15,9 +15,7 @@
 #include "BuildConfig.h"
 #include "Config.h"
 #include "LicenseHelper.h"
-#include "LicenseDlg.h"
 #include "LogHelper.h"
-#include "MachineCode.h"
 #include "Program.h"
 #include "UiGdiPlus.h"
 #include "UiTheme.h"
@@ -1163,13 +1161,10 @@ void CPrintServerDlg::DrawLicenseInfo(HDC hdc, const CRect& card)
         bool mono;
     };
 
-    const std::wstring machineCode = Utf8ToWide(License::MachineCode());
-
     const Row rows[] = {
         { L"授权状态", m_licStatusText.c_str(), m_licStatusInk, false },
         { L"有效期", m_licExpiryText.c_str(), Ui::Design::kTextBody, false },
         { L"授权码", m_licKeyText.empty() ? L"-" : m_licKeyText.c_str(), Ui::Design::kTextBody, true },
-        { L"机器码", machineCode.empty() ? L"获取失败" : machineCode.c_str(), Ui::Design::kTextBody, true },
         { L"主机名", m_infoHost.empty() ? L"-" : m_infoHost.c_str(), Ui::Design::kTextBody, false },
         { L"本机 IP", m_infoIp.empty() ? L"-" : m_infoIp.c_str(), Ui::Design::kTextBody, false },
         { L"运行模式", m_infoMode.empty() ? L"-" : m_infoMode.c_str(), Ui::Design::kTextBody, false },
