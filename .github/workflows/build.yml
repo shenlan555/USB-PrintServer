@@ -29,20 +29,33 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 工程使用 v142 工具集（VS2019），GitHub 镜像默认只有 v143，这里单独安装
-      - name: Install v142 toolset
+      # 工程使用 v142 工具集（VS2019）+ MFC 静态链接，GitHub 镜像默认不含，需单独安装
+      - name: Install v142 toolset and MFC
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $installPath = & $vswhere -latest -products * -property installationPath
           $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
           Write-Host "VS: $installPath"
-          & $installer modify --installPath "$installPath" `
-            --add Microsoft.VisualStudio.Component.VC.v142.x86.x64 `
-            --quiet --norestart --nocache | Out-Null
+          # 依次尝试 v142 MFC + v143 MFC（不同镜像 VS 版本组件 ID 不同）
+          $components = @(
+            "Microsoft.VisualStudio.Component.VC.v142.x86.x64",
+            "Microsoft.VisualStudio.Component.VC.14.29.MFC",
+            "Microsoft.VisualStudio.Component.VC.14.29.ATL",
+            "Microsoft.VisualStudio.Component.VC.ATLMFC"
+          )
+          $args = @("modify", "--installPath", "$installPath", "--quiet", "--norestart", "--nocache")
+          foreach ($c in $components) { $args += "--add"; $args += $c }
+          & $installer @args | Out-Null
           $exit = $LASTEXITCODE
           Write-Host "vs_installer exit code: $exit"
           if ($exit -ne 0 -and $exit -ne 3010) { exit $exit }
+
+          # 打印已安装的 MFC 库路径，便于排查
+          Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | ForEach-Object {
+            $mfc = Join-Path $_.FullName "atlmfc\lib\x64"
+            Write-Host "$($_.Name) MFC: $(Test-Path $mfc)"
+          }
 
       - name: Build
         shell: pwsh
