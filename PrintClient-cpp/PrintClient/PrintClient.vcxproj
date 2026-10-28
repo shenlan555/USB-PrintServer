@@ -1,0 +1,201 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>MFCProj</Keyword>
+    <ProjectGuid>{A7C41E62-5D93-4B18-9F2A-6E3B8C7D1024}</ProjectGuid>
+    <RootNamespace>PrintClient</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Static</UseOfMfc>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Static</UseOfMfc>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\obj\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>PrintClient</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\PrintServer-cpp\PrintServer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <!-- 调试符号不落在输出目录：只写 obj\（编译中间目录） -->
+      <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <!-- 瀵瑰簲 C# 鐨?Application.EnableVisualStyles()锛氬姞杞?6.0 鐗堝叕鍏辨帶浠讹紙涓婚澶栬锛夛紱
+           鍚屾椂涓?WinForms 涓€鑷翠繚鎸?DPI 闈炴劅鐭ワ紙C# 娓呭崟涓棤 dpiAware锛夛紝
+           鍚﹀垯鍥哄畾鍍忕礌甯冨眬浼氫笌闈炴劅鐭ョ殑 WinForms 鍘熺増鍦ㄩ珮 DPI 涓嬩笉涓€鑷淬€?-->
+      <!-- 主题化控件依赖（对应 Application.EnableVisualStyles）；DPI 非感知见下方 Manifest 设置 -->
+      <AdditionalManifestDependencies>type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'</AdditionalManifestDependencies>
+      <AdditionalDependencies>bcrypt.lib;winhttp.lib;winspool.lib;version.lib;ws2_32.lib;iphlpapi.lib;ole32.lib;oleaut32.lib;wbemuuid.lib;netapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <ResourceCompile>
+      <AdditionalOptions>/c65001 %(AdditionalOptions)</AdditionalOptions>
+    </ResourceCompile>
+    <Manifest>
+      <!-- 与 C# 原版一致：不声明 dpiAware（WinForms 未声明 → DPI 非感知）；
+           MFC 静态链接的默认值为 true，会让固定像素布局的字号随系统 DPI 放大 -->
+      <EnableDPIAwareness>false</EnableDPIAwareness>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\..\PrintServer-cpp\PrintServer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <!-- 调试符号不落在输出目录：只写 obj\（编译中间目录） -->
+      <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <!-- 主题化控件依赖（对应 Application.EnableVisualStyles）；DPI 非感知见下方 Manifest 设置 -->
+      <AdditionalManifestDependencies>type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'</AdditionalManifestDependencies>
+      <AdditionalDependencies>bcrypt.lib;winhttp.lib;winspool.lib;version.lib;ws2_32.lib;iphlpapi.lib;ole32.lib;oleaut32.lib;wbemuuid.lib;netapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <ResourceCompile>
+      <AdditionalOptions>/c65001 %(AdditionalOptions)</AdditionalOptions>
+    </ResourceCompile>
+    <Manifest>
+      <!-- 与 C# 原版一致：不声明 dpiAware（WinForms 未声明 → DPI 非感知）；
+           MFC 静态链接的默认值为 true，会让固定像素布局的字号随系统 DPI 放大 -->
+      <EnableDPIAwareness>false</EnableDPIAwareness>
+    </Manifest>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <!-- 澶嶇敤 PrintServer-cpp 涓凡楠岃瘉鐨勫叕鍏辨ā鍧楋紙鐩稿璺緞寮曠敤锛屼笉鏀瑰姩鍏勫紵椤圭洰锛?-->
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\Json.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\Wmi.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\UiTheme.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\UiControls.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\UiGdiPlus.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\third_party\miniz\miniz.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\third_party\miniz\miniz_tdef.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\third_party\miniz\miniz_tinfl.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <ClCompile Include="..\..\PrintServer-cpp\PrintServer\third_party\miniz\miniz_zip.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>TurnOffAllWarnings</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+    </ClCompile>
+    <ClCompile Include="PrintClientApp.cpp" />
+    <ClCompile Include="Program.cpp" />
+    <ClCompile Include="ErrorHandler.cpp" />
+    <ClCompile Include="FileUtil.cpp" />
+    <ClCompile Include="HttpClient.cpp" />
+    <ClCompile Include="LanScanner.cpp" />
+    <ClCompile Include="DriverDownloader.cpp" />
+    <ClCompile Include="DriverSigning.cpp" />
+    <ClCompile Include="PrinterDriverInstaller.cpp" />
+    <ClCompile Include="MainDlg.cpp" />
+    <ClCompile Include="AddressDlg.cpp" />
+    <ClCompile Include="ClientSelfTest.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="framework.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="BuildConfig.h" />
+    <ClInclude Include="PrintClientApp.h" />
+    <ClInclude Include="Program.h" />
+    <ClInclude Include="ErrorHandler.h" />
+    <ClInclude Include="FileUtil.h" />
+    <ClInclude Include="HttpClient.h" />
+    <ClInclude Include="LanScanner.h" />
+    <ClInclude Include="DriverDownloader.h" />
+    <ClInclude Include="PrinterDriverInstaller.h" />
+    <ClInclude Include="MainDlg.h" />
+    <ClInclude Include="AddressDlg.h" />
+    <ClInclude Include="ClientSelfTest.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="PrintClient.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\appicon.ico" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
