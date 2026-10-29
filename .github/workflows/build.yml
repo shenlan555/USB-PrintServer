@@ -116,8 +116,11 @@ jobs:
 
           $failed = @()
           foreach ($c in $cases) {
-            & $exe @($c.args)
-            $code = $LASTEXITCODE
+            # 目标程序是 GUI 子系统（/SUBSYSTEM:WINDOWS），直接调用不会等待进程结束；
+            # 必须 Start-Process -Wait，否则报告还没写出来就去读取、且拿不到退出码。
+            $argLine = ($c.args | ForEach-Object { '"' + $_ + '"' }) -join ' '
+            $proc = Start-Process -FilePath $exe -ArgumentList $argLine -Wait -PassThru -NoNewWindow
+            $code = $proc.ExitCode
             $report = $c.args[-1]
             Write-Host "==== $($c.name): exit=$code ===="
             if (Test-Path $report) {
