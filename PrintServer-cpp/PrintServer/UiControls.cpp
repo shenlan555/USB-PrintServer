@@ -142,7 +142,7 @@ void CNavBar::OnPaint()
         Gfx::Icon::Signal, Gfx::Icon::Printer, Gfx::Icon::Document, Gfx::Icon::Shield
     };
     static const wchar_t* kLabels[kItemCount] = {
-        L"服务器", L"设备列表", L"运行日志", L"授权信息"
+        L"服务器", L"设备列表", L"运行日志", L"软件信息"
     };
 
     for (int i = 0; i < kItemCount; ++i)

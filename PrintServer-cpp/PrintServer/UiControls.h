@@ -17,7 +17,7 @@ namespace ps
 namespace Ui
 {
 
-// 导航项选中通知：wParam = 项序号（0 服务器 / 1 设备列表 / 2 运行日志 / 3 授权信息）
+// 导航项选中通知：wParam = 项序号（0 服务器 / 1 设备列表 / 2 运行日志 / 3 软件信息）
 const UINT kNavSelectionChanged = WM_APP + 60;
 
 class CColorTab : public CWnd

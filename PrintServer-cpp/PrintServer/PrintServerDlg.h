@@ -2,7 +2,7 @@
 
 // 主界面（对应 C# PrintServerForm.cs）
 //
-// 标题栏、授权信息、打印机设置（列表 + 端口自动分配）、服务器信息、服务管理、
+// 标题栏、软件信息、打印机设置（列表 + 端口自动分配）、服务器信息、服务管理、
 // 运行状态、运行日志；并支持最小化到系统托盘、3 秒轮询服务状态与日志。
 
 #include <afxwin.h>
@@ -68,7 +68,7 @@ private:
     void ShowPage(int page);
     void LayoutPrinterCard(int top, int height);
     void LayoutLogCard(int top, int height);
-    void DrawLicenseInfo(HDC hdc, const CRect& card);
+    void DrawSoftwareInfo(HDC hdc, const CRect& card);
     void DrawServerInfo(HDC hdc, const CRect& card);
     void LayoutPageHead();
     void SetHeadPill(UINT id, const wchar_t* text, COLORREF ink);
@@ -87,7 +87,6 @@ private:
     void LoadSavedSettings();
     void UpdateNetworkInfo();
     void UpdateServiceStatus();
-    void UpdateLicenseStatus();
     void LoadExistingLog();
     void AutoRefreshServiceLog();
 
@@ -148,18 +147,14 @@ private:
     CRect m_logBoxRect;     // 运行日志卡片内的深色日志框（OnPaint 铺底）
     CRect m_cardRects[5];       // 当前分页的卡片矩形
                                 // 0 服务器控制 / 1 打印机列表 / 2 运行日志 /
-                                // 3 授权信息 / 4 服务器信息（主机名·本机 IP）
+                                // 3 软件信息 / 4 服务器信息（主机名·本机 IP）
     int m_printerCardTop;       // 打印机列表卡片当前几何（计数胶囊重排时复用）
     int m_printerCardHeight;
 
-    // 授权信息页显示的本机信息（原先放在导航栏底部信息块）
+    // 软件信息页显示的本机信息（原先放在导航栏底部信息块）
     std::wstring m_infoHost;
     std::wstring m_infoIp;
     std::wstring m_infoMode;
-    std::wstring m_licStatusText;
-    std::wstring m_licExpiryText;
-    std::wstring m_licKeyText;      // 授权码（未授权/读取失败时为空）
-    COLORREF m_licStatusInk;
 
     // 打印机列表：当前悬停行（-1 表示无）
     int m_hoverRow;

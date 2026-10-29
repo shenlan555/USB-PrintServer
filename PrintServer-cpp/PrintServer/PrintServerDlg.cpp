@@ -75,7 +75,7 @@ const COLORREF kBtnOutline = Ui::Design::kTextMuted;          // 次级按钮：
 const COLORREF kBtnSelect = Ui::Design::kTextMuted;           // 兼容旧引用
 
 // 主界面布局（客户区 702x641 = 左侧 148 导航栏 + 右侧 554 工作区）
-// 结构：页面标题行（标题 + 授权/服务状态胶囊 + 刷新）→ 服务器控制卡 →
+// 结构：页面标题行（标题 + 服务状态胶囊 + 刷新）→ 服务器控制卡 →
 //       服务器信息卡（主机名 / 本机 IP / 已共享打印机）→ 打印机共享列表卡
 const int kNavWidth = 148;          // 左侧导航栏宽度
 const int kWorkLeft = kNavWidth;    // 工作区左边界
@@ -387,7 +387,6 @@ CPrintServerDlg::CPrintServerDlg(CWnd* pParent)
     , m_trayIcon(nullptr)
     , m_logoIcon(nullptr)
     , m_page(0)
-    , m_licStatusInk(kLabelMuted)
     , m_hoverRow(-1)
     , m_editRow(-1)
     , m_suppressListEvents(false)
@@ -461,7 +460,6 @@ BOOL CPrintServerDlg::OnInitDialog()
     UpdateNetworkInfo();
     UpdateServiceStatus();
     LoadExistingLog();
-    UpdateLicenseStatus();
 
     // 对应 C# 的 Timer(3000ms)：更新服务状态 + 自动刷新服务日志
     SetTimer(kStatusTimerId, 3000, nullptr);
@@ -502,16 +500,9 @@ void CPrintServerDlg::BuildControls()
     // 胶囊文字用 8pt 粗体（原型 .pill font:600 11px）
     HFONT pillFont = Ui::GetFont(kYahei, 8, true);
 
-    // ========== 页面标题行右侧：授权状态 / 服务状态胶囊 + 刷新图标按钮 ==========
+    // ========== 页面标题行右侧：服务状态胶囊 + 刷新图标按钮 ==========
     // 这一行直接落在工作区页面底色上（不在白卡片上），圆角外四角必须铺页面底色，
     // 否则胶囊/图标按钮的圆角会露出白方角
-    HWND licenseStatus = CreateChildWnd(self, L"Static", L"验证中...", SS_LEFT, 0,
-                                        kCardLeft + 282, kPageHeadTop + 7, 76,
-                                        Ui::Design::kPillHeight,
-                                        IDC_PS_LICENSE_STATUS, pillFont);
-    Ui::SetTextColor(licenseStatus, kLabelMuted);
-    Ui::MakePill(this, IDC_PS_LICENSE_STATUS, Ui::Design::kCardBack, kFormBack);
-
     HWND status = CreateChildWnd(self, L"Static", L"已停止", SS_LEFT, 0,
                                  kCardLeft + 366, kPageHeadTop + 7, 76,
                                  Ui::Design::kPillHeight, IDC_PS_STATUS, pillFont);
@@ -707,8 +698,8 @@ void CPrintServerDlg::BuildControls()
     // 日志框（深色）与卡内控件的最终位置
     LayoutLogCard(kCardLogTop, kCardLogHeight);
 
-    // ========== 授权信息页 ==========
-    // 页面内容（含授权码）全部由 OnPaint 直接绘制，页内不放任何子窗口按钮
+    // ========== 软件信息页 ==========
+    // 页面内容全部由 OnPaint 直接绘制，页内不放任何子窗口按钮
 
     // ========== 服务器信息卡（主机名 / 本机 IP / 已共享打印机） ==========
     // 内容同样由 OnPaint 绘制（不建子窗口，避免遮挡、z 序与文字基线问题）
@@ -746,7 +737,7 @@ void CPrintServerDlg::ShowGroup(const UINT* ids, size_t count, bool show)
     }
 }
 
-// 页面标题行右侧：授权胶囊 / 服务胶囊 + 刷新图标按钮，从右向左贴合排布
+// 页面标题行右侧：服务胶囊 + 刷新图标按钮，从右向左贴合排布
 // （原型 flex 右对齐 + gap 8；胶囊宽度随文字自适应）
 void CPrintServerDlg::LayoutPageHead()
 {
@@ -759,21 +750,13 @@ void CPrintServerDlg::LayoutPageHead()
 
     const int refreshLeft = right - Ui::Design::kIconButtonSize;
 
-    // 胶囊宽度随文字自适应，但设上限：长文案（网络错误/已过期）不能挤占页面标题
+    // 胶囊宽度随文字自适应，但设上限：长文案不能挤占页面标题
     int statusWidth = Ui::MeasurePillWidth(::GetDlgItem(self, IDC_PS_STATUS), pillFont);
     if (statusWidth > 170)
         statusWidth = 170;
 
     const int statusLeft = refreshLeft - kColumnGap - statusWidth;
 
-    int licenseWidth = Ui::MeasurePillWidth(::GetDlgItem(self, IDC_PS_LICENSE_STATUS), pillFont);
-    if (licenseWidth > 190)
-        licenseWidth = 190;
-
-    const int licenseLeft = statusLeft - kColumnGap - licenseWidth;
-
-    ::SetWindowPos(::GetDlgItem(self, IDC_PS_LICENSE_STATUS), nullptr, licenseLeft, pillTop,
-                   licenseWidth, Ui::Design::kPillHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     ::SetWindowPos(::GetDlgItem(self, IDC_PS_STATUS), nullptr, statusLeft, pillTop,
                    statusWidth, Ui::Design::kPillHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     ::SetWindowPos(::GetDlgItem(self, IDC_PS_BTN_REFRESH), nullptr, refreshLeft, iconTop,
@@ -871,7 +854,7 @@ void CPrintServerDlg::RegisterCardSurfaces()
     }
 }
 
-// 卡片 0 服务器控制 / 1 打印机共享列表 / 2 运行日志 / 3 授权信息 / 4 服务器信息
+// 卡片 0 服务器控制 / 1 打印机共享列表 / 2 运行日志 / 3 软件信息 / 4 服务器信息
 // （服务器页显示 0 + 4 + 1；设备列表页把 1 铺满）
 bool CPrintServerDlg::IsCardVisible(int index) const
 {
@@ -890,7 +873,7 @@ bool CPrintServerDlg::IsCardVisible(int index) const
 }
 
 // page: 0 服务器（控制卡 + 信息卡 + 列表卡）/ 1 设备列表（列表铺满）/
-//       2 运行日志（日志铺满）/ 3 授权信息（铺满）
+//       2 运行日志（日志铺满）/ 3 软件信息（铺满）
 void CPrintServerDlg::ShowPage(int page)
 {
     if (page < 0 || page > 3)
@@ -965,7 +948,7 @@ void CPrintServerDlg::ShowPage(int page)
         m_pageTitle = L"运行日志";
         break;
     case 3:
-        m_pageTitle = L"授权信息";
+        m_pageTitle = L"软件信息";
         break;
     default:
         m_pageTitle = L"服务器";
@@ -983,7 +966,7 @@ LRESULT CPrintServerDlg::OnNavSelectionChanged(WPARAM wParam, LPARAM /*lParam*/)
 {
     const int index = (int)wParam;
 
-    // 四个导航项都是分页：0 服务器 / 1 设备列表 / 2 运行日志 / 3 授权信息
+    // 四个导航项都是分页：0 服务器 / 1 设备列表 / 2 运行日志 / 3 软件信息
     m_navBar.SetSelection(index);
     ShowPage(index);
     return 0;
@@ -1055,13 +1038,13 @@ void CPrintServerDlg::OnPaint()
 
     if (IsCardVisible(3))
     {
-        Ui::DrawCardFace(hdc, m_cardRects[3], L"授权信息", cardFont);
-        DrawLicenseInfo(hdc, m_cardRects[3]);
+        Ui::DrawCardFace(hdc, m_cardRects[3], L"软件信息", cardFont);
+        DrawSoftwareInfo(hdc, m_cardRects[3]);
     }
 }
 
 // 服务器信息卡内容：主机名 / 本机 IP
-// 与「授权信息」页一样直接画在对话框 DC 上（不建子窗口：避免遮挡与 z 序问题，
+// 与「软件信息」页一样直接画在对话框 DC 上（不建子窗口：避免遮挡与 z 序问题，
 // 文字也能精确按行居中，不受 Static 贴顶绘制的影响）
 void CPrintServerDlg::DrawServerInfo(HDC hdc, const CRect& card)
 {
@@ -1149,9 +1132,9 @@ void CPrintServerDlg::DrawServerInfo(HDC hdc, const CRect& card)
     }
 }
 
-// 授权信息页内容：授权状态/有效期/机器码 + 本机信息（原导航栏底部信息块）
+// 软件信息页内容：版本 / 运行模式 / 主机名 / 本机 IP
 // 全部为只读展示，直接画在对话框 DC 上（不建子窗口，避免遮挡与 z 序问题）
-void CPrintServerDlg::DrawLicenseInfo(HDC hdc, const CRect& card)
+void CPrintServerDlg::DrawSoftwareInfo(HDC hdc, const CRect& card)
 {
     struct Row
     {
@@ -1162,13 +1145,10 @@ void CPrintServerDlg::DrawLicenseInfo(HDC hdc, const CRect& card)
     };
 
     const Row rows[] = {
-        { L"授权状态", m_licStatusText.c_str(), m_licStatusInk, false },
-        { L"有效期", m_licExpiryText.c_str(), Ui::Design::kTextBody, false },
-        { L"授权码", m_licKeyText.empty() ? L"-" : m_licKeyText.c_str(), Ui::Design::kTextBody, true },
+        { L"软件版本", m_version.IsEmpty() ? L"-" : (const wchar_t*)m_version, Ui::Design::kTextBody, false },
+        { L"运行模式", m_infoMode.empty() ? L"-" : m_infoMode.c_str(), Ui::Design::kTextBody, false },
         { L"主机名", m_infoHost.empty() ? L"-" : m_infoHost.c_str(), Ui::Design::kTextBody, false },
         { L"本机 IP", m_infoIp.empty() ? L"-" : m_infoIp.c_str(), Ui::Design::kTextBody, false },
-        { L"运行模式", m_infoMode.empty() ? L"-" : m_infoMode.c_str(), Ui::Design::kTextBody, false },
-        { L"软件版本", m_version.IsEmpty() ? L"-" : (const wchar_t*)m_version, Ui::Design::kTextBody, false },
     };
 
     const int pad = Ui::Design::kCardPad;
@@ -1826,7 +1806,7 @@ void CPrintServerDlg::UpdateNetworkInfo()
         joined += addresses[i];
     }
 
-    // 导航栏底部不再放本机信息块（主机名/IP 在「服务器信息」卡与「授权信息」页展示）
+    // 导航栏底部不再放本机信息块（主机名/IP 在「服务器信息」卡与「软件信息」页展示）
     m_infoIp = joined.empty() ? L"-" : Utf8ToWide(joined);
     m_infoHost = Utf8ToWide(computerName);
 
@@ -1935,90 +1915,6 @@ void CPrintServerDlg::UpdateServiceStatus()
         Ui::SetOutlineButtonColor(this, IDC_PS_BTN_INSTALL, kGroupText, Ui::Design::kFieldBorder);
         Ui::SetButtonText(this, IDC_PS_BTN_SERVICE_START, L"启动服务");
     }
-}
-
-void CPrintServerDlg::UpdateLicenseStatus()
-{
-    // 页面标题行只放两个胶囊：授权状态（含有效期）+ 服务状态。
-    // 有效期的完整文案在授权信息页里，这里压成短后缀以免胶囊过长。
-    License::Status status = License::CurrentStatus();
-
-    std::wstring text = Utf8ToWide(License::GetStatusText());
-    std::wstring expiry = Utf8ToWide(License::GetLicenseExpiryText());
-    COLORREF ink = kLabelMuted;
-
-    switch (status)
-    {
-    case License::Status::Licensed:
-        ink = kColorGreen;
-        break;
-
-    case License::Status::Unlicensed:
-        text = L"未授权";
-        expiry.clear();
-        ink = kColorRed;
-        break;
-
-    case License::Status::Expired:
-        text = L"授权已过期";
-        ink = kColorOrangeRed;
-        break;
-
-    case License::Status::Disabled:
-        text = L"授权已被禁用";
-        ink = kColorRed;
-        break;
-
-    case License::Status::NetworkError:
-        text = L"网络错误，授权验证失败";
-        ink = kColorOrange;
-        break;
-
-    default:
-        text = L"验证中...";
-        expiry.clear();
-        ink = kColorGray;
-        break;
-    }
-
-    if (!expiry.empty())
-    {
-        const std::wstring prefix = L"有效期至: ";
-        const std::wstring expiredPrefix = L"已过期: ";
-        const std::wstring neverPrefix = L"有效期: ";
-
-        // 有效期措辞决定胶囊颜色（沿用原 UpdateExpiryLabel 的取色规则）
-        if (expiry.find(L"已过期") != std::wstring::npos)
-        {
-            ink = kColorOrangeRed;
-        }
-        else if (expiry.find(L"永不过期") == std::wstring::npos)
-        {
-            const int remainingDays = License::GetExpiryRemainingDays();
-            if (remainingDays >= 0 && remainingDays <= 7)
-                ink = kColorOrange;
-        }
-
-        if (expiry.compare(0, prefix.size(), prefix) == 0)
-            expiry = L"至 " + expiry.substr(prefix.size());
-        else if (expiry.compare(0, neverPrefix.size(), neverPrefix) == 0)
-            expiry = expiry.substr(neverPrefix.size());
-        else if (expiry.compare(0, expiredPrefix.size(), expiredPrefix) == 0)
-            expiry = L"已过期 " + expiry.substr(expiredPrefix.size());
-
-        text += L" · " + expiry;
-    }
-
-    // 授权信息页用的分列文案（状态 / 有效期 / 授权码分开显示）
-    m_licStatusText = Utf8ToWide(License::GetStatusText());
-    m_licExpiryText = expiry.empty() ? L"-" : expiry;
-    m_licStatusInk = ink;
-    m_licKeyText = Utf8ToWide(License::CurrentLicenseKey());
-
-    SetHeadPill(IDC_PS_LICENSE_STATUS, text.c_str(), ink);
-
-    if (m_page == 3)
-        Invalidate(FALSE);
 }
 
 std::string CPrintServerDlg::GetApiPortText()

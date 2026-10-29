@@ -69,15 +69,6 @@ FONT 9, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
 
-// 对应 C# LicenseForm：Size 560x510，Sizable + 最小/最大同值（实际固定尺寸）
-IDD_LICENSE_DIALOG DIALOGEX 0, 0, 375, 265
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX
-EXSTYLE WS_EX_APPWINDOW
-CAPTION "PrintServer 授权激活"
-FONT 9, "MS Shell Dlg", 400, 0, 0x1
-BEGIN
-END
-
 /////////////////////////////////////////////////////////////////////////////
 //
 // DESIGNINFO
