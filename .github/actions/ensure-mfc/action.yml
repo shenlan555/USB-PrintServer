@@ -1,0 +1,44 @@
+name: Ensure MFC / MSVC toolset
+description: >-
+  windows-2022 镜像通常已自带 v143 工具集与 MFC；只有确实缺失时才调用
+  vs_installer 补装（补装很慢，正常路径应秒过）。
+
+runs:
+  using: composite
+  steps:
+    - name: Check MSVC + MFC, install only when missing
+      shell: pwsh
+      run: |
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (-not (Test-Path $vswhere)) {
+          Write-Error "未找到 vswhere，镜像可能不是 Windows Server 2022 + VS2022"
+          exit 1
+        }
+
+        $installPath = & $vswhere -latest -products * -property installationPath
+        Write-Host "VS: $installPath"
+
+        $withMfc = @(Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory -ErrorAction SilentlyContinue |
+                     Where-Object { Test-Path (Join-Path $_.FullName "atlmfc\lib\x64") })
+        if ($withMfc.Count -gt 0) {
+          Write-Host "MFC 已就绪: $($withMfc[0].Name)（跳过安装）"
+          exit 0
+        }
+
+        Write-Host "镜像缺少 MFC，开始补装 VC v143 x86.x64 + ATLMFC ..."
+        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        $args = @("modify", "--installPath", "$installPath", "--quiet", "--norestart", "--nocache",
+                  "--add", "Microsoft.VisualStudio.Component.VC.v143.x86.x64",
+                  "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC")
+        & $installer @args | Out-Null
+        $exit = $LASTEXITCODE
+        Write-Host "vs_installer exit code: $exit"
+        if ($exit -ne 0 -and $exit -ne 3010) { exit $exit }
+
+        $withMfc = @(Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory |
+                     Where-Object { Test-Path (Join-Path $_.FullName "atlmfc\lib\x64") })
+        if ($withMfc.Count -eq 0) {
+          Write-Error "补装后仍未找到 MFC 库"
+          exit 1
+        }
+        Write-Host "MFC 补装完成: $($withMfc[0].Name)"
