@@ -57,11 +57,15 @@ jobs:
           }
           $out = "out/${{ matrix.artifact }}"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          # bin/<Platform>/<Configuration>/ 下的 exe 与 pdfium.dll（若有）
+          # bin/<Platform>/<Configuration>/ 下的 exe
           Get-ChildItem -Path . -Recurse -Include "${{ matrix.target }}.exe" |
             ForEach-Object { Copy-Item $_.FullName -Destination $out -Force }
-          $dll = Get-ChildItem -Path . -Recurse -Filter pdfium.dll | Select-Object -First 1
-          if ($dll) { Copy-Item $dll.FullName -Destination $out -Force }
+          # 只有服务端运行时需要 pdfium.dll；客户端带上它只是白白多 7 MB
+          if ('${{ matrix.target }}' -eq 'PrintServer') {
+            $dll = Get-ChildItem -Path . -Recurse -Filter pdfium.dll | Select-Object -First 1
+            if ($dll) { Copy-Item $dll.FullName -Destination $out -Force }
+            else { Write-Error "未找到 pdfium.dll"; exit 1 }
+          }
           Get-ChildItem $out -File | Select-Object Name, Length | Format-Table -AutoSize
           if (-not (Test-Path "$out/${{ matrix.target }}.exe")) {
             Write-Error "未找到 ${{ matrix.target }}.exe，构建输出缺失"
@@ -75,7 +79,7 @@ jobs:
           path: out/${{ matrix.artifact }}/
           if-no-files-found: error
 
-  # 命令行自检只在 Debug 构建里保留（Release 交付版已剥离，防止被当作免授权入口），
+  # 命令行自检只在 Debug 构建里保留（Release 交付版已剥离，避免留下绕过管理员检查的入口），
   # 所以单独跑一个 Debug 作业：加密向量、HTTP API、TCP 打印三条链路任一失败即红。
   selftest:
     name: Self-test (x64 Debug)
