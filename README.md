@@ -1,6 +1,6 @@
 # USB-PrintServer（网络打印服务器 / 打印客户端）
 
-[📄 更新日志（v1.4.3）](更新日志.txt)　｜　⬇ [下载 Release](https://github.com/shenlan555/USB-PrintServer/releases)　｜　⚖ [MIT 许可证](LICENSE)
+当前版本 [v1.4.3](https://github.com/shenlan555/USB-PrintServer/releases/tag/v1.4.3) · [更新日志](更新日志.md) · [许可证](LICENSE)
 
 把接在 Windows 电脑上的 USB / 本地打印机，变成一台 **RAW/IPP 网络打印机**：局域网内其他电脑像添加普通网络打印机一样直接连接，无需共享账户密码，支持 PDF 免驱打印、多打印机共享、Windows 服务模式运行。
 
@@ -11,7 +11,7 @@ USB-PrintServer/
 ├── .github/workflows/  GitHub Actions 自动编译
 ├── PrintServer-cpp/    服务端（装在共享打印机的电脑上）
 ├── PrintClient-cpp/    客户端（装在需要连接打印机的电脑上，辅助自动装驱动）
-└── 更新日志.txt        版本更新日志
+└── 更新日志.md         版本变更记录
 ```
 
 ## 主要功能（v1.4.3）
