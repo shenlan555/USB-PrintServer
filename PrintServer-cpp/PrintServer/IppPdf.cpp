@@ -9,7 +9,7 @@
 //     不会出现"漏拷 dll 导致整个服务起不来"的情况。
 //   - 不引入导入库，因此 vcxproj 只多了把 dll 复制到输出目录的步骤。
 //
-// 许可：PDFium 为 BSD-3-Clause，商业闭源分发可用，需保留其版权声明
+// 许可：PDFium 为 BSD-3-Clause，可随包分发，需保留其版权声明
 //       （third_party/pdfium/LICENSE 与 licenses/ 目录随包保留）。
 //
 // 注意：从 IppPdf.cpp 原 Windows.Data.Pdf 实现切换而来，接口未变；
