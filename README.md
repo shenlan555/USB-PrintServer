@@ -1,5 +1,7 @@
 # USB-PrintServer（网络打印服务器 / 打印客户端）
 
+[📄 更新日志（v1.4.3）](更新日志.txt)　｜　⬇ [下载 Release](https://github.com/shenlan555/USB-PrintServer/releases)　｜　⚖ [MIT 许可证](LICENSE)
+
 把接在 Windows 电脑上的 USB / 本地打印机，变成一台 **RAW/IPP 网络打印机**：局域网内其他电脑像添加普通网络打印机一样直接连接，无需共享账户密码，支持 PDF 免驱打印、多打印机共享、Windows 服务模式运行。
 
 ## 仓库结构
@@ -49,23 +51,6 @@ TCP 打印三条自测链路，任一失败则本次运行标红；各条目的�
   `WindowsTargetPlatformVersion` 为 `10.0`（取本机已装的最新 10.x SDK），因此无需手工改项目属性
 - `pdfium.dll` 必须与 `PrintServer.exe` 同目录（仓库已附带一份；如需更新版本请从 PDFium 官方发布获取）
 - Win7 需安装 KB2999226，否则 PDF 免驱打印不可用（自动降级为 PDL 直通，RAW 打印不受影响）
-
-### 冒烟自测（仅 Debug 构建）
-
-Debug 版带命令行自测入口（Release 交付版已剥离，避免留下绕过管理员检查的启动入口）。全部通过时进程退出码为 0，
-任一条目失败为 1，可直接接进脚本或 CI：
-
-```bat
-PrintServer.exe /cryptotest PrintServer-cpp\testdata\crypto_vectors.txt crypto_report.txt
-PrintServer.exe /apitest api_report.txt
-PrintServer.exe /tcptest tcp_report.txt
-```
-
-- `/cryptotest`：MD5 / HMAC-SHA256 / AES-256-CBC / DPAPI 作用域 / 离线 .lic 链路，以及 App.config 读取；
-  期望值由独立实现（.NET）按 `key = SHA256(secret)`、`iv = SHA256(secret + "iv_salt")` 前 16 字节计算，
-  与源码实现互为验证。DPAPI 密文绑定具体机器，向量文件里留空表示跳过该条交叉解密（仍做本机往返校验）
-- `/apitest`：本地起 HTTP API（端口 19180），验证 `/api/test`、`/api/info`、404、OPTIONS 预检
-- `/tcptest`：本地起 RAW 打印服务（端口 19100），验证 IPv4/IPv6 接入、收数据与失败路径日志
 
 ## 使用说明
 
