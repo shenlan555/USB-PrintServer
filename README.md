@@ -9,7 +9,7 @@ USB-PrintServer/
 ├── .github/workflows/  GitHub Actions 自动编译
 ├── PrintServer-cpp/    服务端（装在共享打印机的电脑上）
 ├── PrintClient-cpp/    客户端（装在需要连接打印机的电脑上，辅助自动装驱动）
-└── 说明日志.txt        版本更新日志
+└── 更新日志.txt        版本更新日志
 ```
 
 ## 主要功能（v1.4.3）
