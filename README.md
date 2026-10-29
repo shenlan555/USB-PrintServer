@@ -1,6 +1,6 @@
 # USB-PrintServer（网络打印服务器 / 打印客户端）
 
-当前版本 [v1.4.3](https://github.com/shenlan555/USB-PrintServer/releases/tag/v1.4.3) · [更新日志](更新日志.md) · [许可证](LICENSE)
+当前版本 [v1.4.3](https://github.com/shenlan555/USB-PrintServer/releases/tag/v1.4.3) · [更新日志](更新日志.md)
 
 把接在 Windows 电脑上的 USB / 本地打印机，变成一台 **RAW/IPP 网络打印机**：局域网内其他电脑像添加普通网络打印机一样直接连接，无需共享账户密码，支持 PDF 免驱打印、多打印机共享、Windows 服务模式运行。
 
