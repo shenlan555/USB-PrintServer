@@ -895,7 +895,7 @@ void CPrintServerDlg::ShowPage(int page)
     const bool serverPage = (page == 0);
     const bool devicesPage = (page == 1);
     const bool logsPage = (page == 2);
-    const bool licensePage = (page == 3);
+    const bool infoPage = (page == 3);
 
     ShowGroup(kServerGroup, _countof(kServerGroup), serverPage);
     ShowGroup(kPrinterGroup, _countof(kPrinterGroup), serverPage || devicesPage);
@@ -935,7 +935,7 @@ void CPrintServerDlg::ShowPage(int page)
         LayoutLogCard(m_cardRects[2].top, m_cardRects[2].Height());
     }
 
-    if (licensePage)
+    if (infoPage)
         m_cardRects[3].SetRect(kCardLeft, fillTop, kCardLeft + kCardWidth, fillTop + fillHeight);
 
     switch (page)
