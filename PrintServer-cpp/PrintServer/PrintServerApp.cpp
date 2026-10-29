@@ -98,7 +98,10 @@ BOOL CPrintServerApp::InitInstance()
                 report = vectors + L".report.txt";
             }
 
-            ps::RunCryptoSelfTest(vectors, report);
+            {
+                const int failures = ps::RunCryptoSelfTest(vectors, report);
+                m_exitCode = (failures == 0) ? 0 : 1;
+            }
             return FALSE;
         }
 
@@ -113,7 +116,10 @@ BOOL CPrintServerApp::InitInstance()
                 report = std::wstring(temp) + L"tcp_selftest_report.txt";
             }
 
-            ps::RunTcpSelfTest(report);
+            {
+                const int failures = ps::RunTcpSelfTest(report);
+                m_exitCode = (failures == 0) ? 0 : 1;
+            }
             return FALSE;
         }
 
@@ -128,7 +134,10 @@ BOOL CPrintServerApp::InitInstance()
                 report = std::wstring(temp) + L"api_selftest_report.txt";
             }
 
-            ps::RunApiSelfTest(report);
+            {
+                const int failures = ps::RunApiSelfTest(report);
+                m_exitCode = (failures == 0) ? 0 : 1;
+            }
             return FALSE;
         }
 
@@ -143,7 +152,10 @@ BOOL CPrintServerApp::InitInstance()
                 report = std::wstring(temp) + L"service_selftest_report.txt";
             }
 
-            ps::RunServiceSelfTest(report);
+            {
+                const int failures = ps::RunServiceSelfTest(report);
+                m_exitCode = (failures == 0) ? 0 : 1;
+            }
             return FALSE;
         }
 
@@ -263,7 +275,10 @@ int CPrintServerApp::ExitInstance()
         m_trayMutex = nullptr;
     }
 
-    return CWinApp::ExitInstance();
+    const int baseCode = CWinApp::ExitInstance();
+
+    // 自检模式：失败时让进程以非 0 退出，CI 直接看退出码即可
+    return (baseCode != 0) ? baseCode : m_exitCode;
 }
 
 bool CPrintServerApp::RunTrayMode()

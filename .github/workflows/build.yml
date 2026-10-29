@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# 同一分支的旧运行直接取消，省 runner 配额
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build ${{ matrix.target }} (x64 Release)
@@ -29,39 +34,15 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # windows-2022：镜像的 v142 工具集不含 MFC，构建改用 v143（源码兼容，MFC 完整）
-      - name: Install MSVC toolset and MFC
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installPath = & $vswhere -latest -products * -property installationPath
-          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-          Write-Host "VS: $installPath"
-          # 依次尝试 v142 MFC + v143 MFC（不同镜像 VS 版本组件 ID 不同）
-          # 镜像上的 14.29 无 MFC，只有较新工具集带 MFC；补装 v143 全家桶保证可用
-          $components = @(
-            "Microsoft.VisualStudio.Component.VC.v143.x86.x64",
-            "Microsoft.VisualStudio.Component.VC.ATLMFC"
-          )
-          $args = @("modify", "--installPath", "$installPath", "--quiet", "--norestart", "--nocache")
-          foreach ($c in $components) { $args += "--add"; $args += $c }
-          & $installer @args | Out-Null
-          $exit = $LASTEXITCODE
-          Write-Host "vs_installer exit code: $exit"
-          if ($exit -ne 0 -and $exit -ne 3010) { exit $exit }
-
-          # 打印已安装的 MFC 库路径，便于排查
-          Get-ChildItem "$installPath\VC\Tools\MSVC" -Directory | ForEach-Object {
-            $mfc = Join-Path $_.FullName "atlmfc\lib\x64"
-            Write-Host "$($_.Name) MFC: $(Test-Path $mfc)"
-          }
+      # 镜像自带 v143 + MFC 时秒过；缺失才补装（见 .github/actions/ensure-mfc）
+      - name: Ensure MSVC toolset and MFC
+        uses: ./.github/actions/ensure-mfc
 
       - name: Build
         shell: pwsh
         run: |
           msbuild "${{ matrix.solution }}" `
             /m /p:Configuration=Release /p:Platform=x64 `
-            /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 `
             /v:minimal /nologo
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -93,3 +74,70 @@ jobs:
           name: ${{ matrix.artifact }}
           path: out/${{ matrix.artifact }}/
           if-no-files-found: error
+
+  # 命令行自检只在 Debug 构建里保留（Release 交付版已剥离，防止被当作免授权入口），
+  # 所以单独跑一个 Debug 作业：加密向量、HTTP API、TCP 打印三条链路任一失败即红。
+  selftest:
+    name: Self-test (x64 Debug)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Ensure MSVC toolset and MFC
+        uses: ./.github/actions/ensure-mfc
+
+      - name: Build (Debug)
+        shell: pwsh
+        run: |
+          msbuild "PrintServer-cpp/PrintServer.sln" `
+            /m /p:Configuration=Debug /p:Platform=x64 `
+            /v:minimal /nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run self-tests
+        shell: pwsh
+        run: |
+          $exe = "PrintServer-cpp\bin\x64\Debug\PrintServer.exe"
+          if (-not (Test-Path $exe)) { Write-Error "未找到 $exe"; exit 1 }
+
+          $out = "out/selftest"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+
+          $cases = @(
+            @{ name = "crypto"; args = @("/cryptotest", "PrintServer-cpp\testdata\crypto_vectors.txt", "$out\crypto_report.txt") },
+            @{ name = "api";    args = @("/apitest",    "$out\api_report.txt") },
+            @{ name = "tcp";    args = @("/tcptest",    "$out\tcp_report.txt") }
+          )
+
+          $failed = @()
+          foreach ($c in $cases) {
+            & $exe @($c.args)
+            $code = $LASTEXITCODE
+            $report = $c.args[-1]
+            Write-Host "==== $($c.name): exit=$code ===="
+            if (Test-Path $report) {
+              Get-Content $report | Select-Object -Last 4 | ForEach-Object { Write-Host "    $_" }
+            } else {
+              Write-Host "    报告缺失: $report"
+            }
+            if ($code -ne 0) { $failed += $c.name }
+          }
+
+          if ($failed.Count -gt 0) {
+            Write-Error "自测失败: $($failed -join ', ')"
+            exit 1
+          }
+          Write-Host "全部自测通过"
+
+      - name: Upload self-test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-reports
+          path: out/selftest/
+          if-no-files-found: warn

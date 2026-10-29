@@ -1,0 +1,27 @@
+# PrintServer 加密兼容性自检向量（PrintServer.exe /cryptotest <本文件> <报告>）
+#
+# 说明：这些期望值由独立实现（.NET System.Security.Cryptography，PKCS#7 / CBC）
+# 计算得出，不依赖本仓库的 C++ 代码，因此能真正校验实现是否与既定算法约定一致：
+#   key = SHA256(secret)
+#   iv  = SHA256(secret + "iv_salt") 的前 16 字节
+#   摘要：MD5（小写十六进制）
+#   HMAC：HMAC-SHA256，key = UTF8(secret)，输出 Base64
+#
+# dpapi_b64_cs 依赖具体机器与本机 DPAPI 主密钥，无法预生成；留空表示跳过该条交叉解密，
+# 运行时仍会做 DPAPI 本机作用域往返校验。不得把某台机器生成的 blob 提进来。
+
+secret_cs=REMOVED-FREE-VERSION
+url_cs=
+md5_input=TEST-MACHINE-CODE-001
+md5_hex_cs=650b61c7e648b23ca1c9af2ed7e76fbd
+hmac_data=1700000000|/api/driver?id=0
+hmac_b64_cs=lA9nam80ybHp5oycK1rpf7RnH9ZW4pBaIFGFhbMme/Q=
+aes_plain=license_key=TEST-KEY-0001;machine_code=TEST-MACHINE-CODE-001
+aes_b64_cs=s7Z93MGRsjVh4Cz4cd8gondWHB2sdwEygPMTkTx1HIMlWDhIb66t2/RsSFSn0ndryi2ksYVGvi5oAKXzWW8tNg==
+dpapi_plain=license_key=TEST-KEY-0001
+dpapi_b64_cs=
+lic_data=4gBuMXMaKck0hjKBF2WHKtk1vvIfpovGKg3/I+UnGn+eiWxxdz6mU8BXeRiZ6Ag1zbt9VKVQz03gkdSsxfU8HDa45EElEz/QMbCcKt7MuOBrn8F05MnhNoxFWxbsRwcIs9gUjRrJg0vXRyk6or/4MA==
+lic_sig=ab5XA5jf7GoD8WygR7/mKBOV7wkXs5Py3C9pWp1fxjY=
+lic_sig_tampered=Bb5XA5jf7GoD8WygR7/mKBOV7wkXs5Py3C9pWp1fxjY=
+lic_key_expected=TEST-KEY-0001
+lic_expires_expected=2099-12-31

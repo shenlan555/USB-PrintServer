@@ -183,8 +183,13 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
         // 交叉解密 C# 产物
         check("AES 解密(C# 密文)", Crypto::AesDecryptWithSecret(aesCs, secret), aesPlain);
 
-        // DPAPI 交叉解密（同一用户/同一机器）
-        check("DPAPI 解密(C# 密文)", Crypto::DecryptFromBase64(dpapiCs), dpapiPlain);
+        // DPAPI 交叉解密（同一用户/同一机器）。
+        // 密文与机器的 DPAPI 主密钥绑定，无法写进随仓库分发的向量文件：
+        // 向量里留空即视为「跳过」，运行时仍会做下面的本机往返与作用域校验。
+        if (dpapiCs.empty())
+            append("[SKIP] %-28s\r\n", "DPAPI 解密(预置密文)（向量未提供）");
+        else
+            check("DPAPI 解密(C# 密文)", Crypto::DecryptFromBase64(dpapiCs), dpapiPlain);
 
         // 自身往返
         check("DPAPI 往返", Crypto::DecryptFromBase64(Crypto::EncryptToBase64(dpapiPlain)), dpapiPlain);

@@ -18,6 +18,10 @@ private:
     bool RunTrayMode();
 
     HANDLE m_trayMutex;
+
+    // 进程退出码：命令行自检模式（/cryptotest 等）把失败数折算成 1 返回，
+    // 便于 CI 直接按退出码判定，不必再解析报告文本。
+    int m_exitCode = 0;
 };
 
 extern CPrintServerApp theApp;
