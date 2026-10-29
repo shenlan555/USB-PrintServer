@@ -6,7 +6,6 @@
 #include <stdexcept>
 
 #include "LogHelper.h"
-#include "LicenseHelper.h"
 #include "Config.h"
 
 namespace ps
@@ -80,8 +79,6 @@ ServiceHost::ServiceHost()
 
     // 对应 C# 构造函数：serviceEventLog.Source = "PrintServer"; Log = "Application";
     EnsureEventSource();
-
-    License::Initialize();
 }
 
 ServiceHost::~ServiceHost()
@@ -226,19 +223,6 @@ void ServiceHost::OnStart()
 {
     try
     {
-        bool licensed = License::StartValidation();
-        if (!licensed)
-        {
-            std::string errorMsg = "启动校验未通过，服务启动被阻止。状态: " + License::GetStatusText();
-            WriteEventLog(errorMsg, true);
-            Log::WriteLog("[授权] " + errorMsg);
-
-            m_exitCode = 1066;
-            OnStop();
-            return;
-        }
-
-
         std::vector<PrinterConfig> configs = ConfigHelper::GetPrinterConfigs();
         if (configs.empty())
         {
@@ -251,10 +235,7 @@ void ServiceHost::OnStart()
             return;
         }
 
-        {
-            const std::string key = License::CurrentLicenseKey();
-            Log::WriteLog("[服务] 启动校验通过" + (key.empty() ? std::string() : (" - " + key)));
-        }
+        Log::WriteLog("[服务] 已启动，共 " + std::to_string(configs.size()) + " 台打印机");
 
         std::string addresses;
         {

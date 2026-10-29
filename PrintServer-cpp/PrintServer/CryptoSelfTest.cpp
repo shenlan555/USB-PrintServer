@@ -8,7 +8,6 @@
 #include "HttpApiService.h"
 #include "ServiceHost.h"
 #include "LogHelper.h"
-#include "LicenseHelper.h"
 
 #include <winhttp.h>
 #include <winsock2.h>
@@ -154,77 +153,36 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
     {
         std::map<std::string, std::string> v = ParseVectors(raw);
 
-        const std::string secret    = Get(v, "secret_cs");
-        const std::string urlCs     = Get(v, "url_cs");
-        const std::string md5Input  = Get(v, "md5_input");
-        const std::string md5Cs     = Get(v, "md5_hex_cs");
-        const std::string hmacData  = Get(v, "hmac_data");
-        const std::string hmacCs    = Get(v, "hmac_b64_cs");
-        const std::string aesPlain  = Get(v, "aes_plain");
-        const std::string aesCs     = Get(v, "aes_b64_cs");
-        const std::string dpapiPlain= Get(v, "dpapi_plain");
-        const std::string dpapiCs   = Get(v, "dpapi_b64_cs");
+        const std::string md5Input    = Get(v, "md5_input");
+        const std::string md5Expected = Get(v, "md5_hex_cs");
+        const std::string hmacData    = Get(v, "hmac_data");
+        const std::string hmacExpected= Get(v, "hmac_b64_cs");
 
-        append("=========== PrintServer C++ 加密兼容性自检 ===========\r\n\r\n");
+        append("=========== PrintServer 加密自检 ===========\r\n\r\n");
 
-        // 编译期常量是否与 C# 源一致
-        check("secret 常量", BuildConfig::SecretKey, secret);
-        check("LicenseUrl 常量", Crypto::DecodeLicenseUrl(), urlCs);
+        // 摘要：期望值由独立实现（.NET）算出，确认算法口径一致
+        check("MD5", ToHexLower(Crypto::Md5(md5Input)), md5Expected);
 
-        // 摘要
-        check("MD5 机器码摘要", ToHexLower(Crypto::Md5(md5Input)), md5Cs);
+        // HMAC-SHA256：与 /api/driver 鉴权使用的是同一组密钥与算法
+        check("HMAC-SHA256(/api/driver 密钥)",
+              Crypto::GenerateHmacSignature(hmacData, BuildConfig::ApiAuthSecret), hmacExpected);
 
-        // HMAC-SHA256
-        check("HMAC-SHA256", Crypto::GenerateHmacSignature(hmacData, secret), hmacCs);
-
-        // AES-256-CBC（与服务端一致）：加密结果必须逐字节相同
-        check("AES 加密(服务端密钥)", Crypto::AesEncryptWithSecret(aesPlain, secret), aesCs);
-
-        // 交叉解密 C# 产物
-        check("AES 解密(C# 密文)", Crypto::AesDecryptWithSecret(aesCs, secret), aesPlain);
-
-        // DPAPI 交叉解密（同一用户/同一机器）。
-        // 密文与机器的 DPAPI 主密钥绑定，无法写进随仓库分发的向量文件：
-        // 向量里留空即视为「跳过」，运行时仍会做下面的本机往返与作用域校验。
-        if (dpapiCs.empty())
-            append("[SKIP] %-28s\r\n", "DPAPI 解密(预置密文)（向量未提供）");
-        else
-            check("DPAPI 解密(C# 密文)", Crypto::DecryptFromBase64(dpapiCs), dpapiPlain);
-
-        // 自身往返
-        check("DPAPI 往返", Crypto::DecryptFromBase64(Crypto::EncryptToBase64(dpapiPlain)), dpapiPlain);
-        check("本地 AES 往返", Crypto::AesDecryptFromBase64(Crypto::AesEncryptToBase64(aesPlain)), aesPlain);
-
-        // DPAPI 作用域：必须写成"本机作用域"。
-        // 界面程序以登录用户身份运行、服务以 LocalSystem 身份运行，两者可能共用同一份
-        // 本地密文；用户作用域的密文在另一账户下无法解密。
-        // DPAPI v1 密文头部 offset 40 记录作用域标志，CRYPTPROTECT_LOCAL_MACHINE = 0x4。
-        {
-            std::vector<unsigned char> blob;
-            bool decoded = Crypto::Base64Decode(Crypto::EncryptToBase64(dpapiPlain), blob);
-            unsigned int scopeFlags = 0;
-            if (decoded && blob.size() >= 44)
-            {
-                scopeFlags = (unsigned int)blob[40] |
-                             ((unsigned int)blob[41] << 8) |
-                             ((unsigned int)blob[42] << 16) |
-                             ((unsigned int)blob[43] << 24);
-            }
-            append("DPAPI 作用域标志 = 0x%08x\r\n", scopeFlags);
-            check("DPAPI 本机作用域(服务与界面可共用)",
-                  (scopeFlags & 0x00000004u) != 0 ? "machine" : "user", "machine");
-        }
-
-        // HMAC 验签（含大小写不敏感语义）
-        bool verifyOk = Crypto::VerifyHmacSignature(hmacData, hmacCs, secret);
-        bool verifyBad = Crypto::VerifyHmacSignature(hmacData, "AAAA", secret);
+        // 验签（大小写不敏感）
+        const bool verifyOk = Crypto::VerifyHmacSignature(hmacData, hmacExpected, BuildConfig::ApiAuthSecret);
+        const bool verifyBad = Crypto::VerifyHmacSignature(hmacData, "AAAA", BuildConfig::ApiAuthSecret);
         check("HMAC 验签(正例)", verifyOk ? "true" : "false", "true");
         check("HMAC 验签(反例)", verifyBad ? "true" : "false", "false");
 
-        // 离线 .lic 解密链路（HMAC + AES 组合）
-        check("DecryptLicenseFile 链路",
-              Crypto::DecryptLicenseFile(aesCs, Crypto::GenerateHmacSignature(aesCs, secret), secret),
-              aesPlain);
+        // Base64 往返
+        {
+            const std::string text = "PrintServer/1.4.3/base64";
+            std::vector<unsigned char> bytes;
+            const std::string encoded = Crypto::Base64Encode(
+                std::vector<unsigned char>(text.begin(), text.end()));
+            const bool decoded = Crypto::Base64Decode(encoded, bytes);
+            check("Base64 往返",
+                  (decoded && std::string(bytes.begin(), bytes.end()) == text) ? "ok" : "fail", "ok");
+        }
 
         // ---------------- App.config 读取 ----------------
         append("\r\n---- 配置读取（App.config）----\r\n");
@@ -236,45 +194,6 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
         check("注释项 Printer0_Name", Config::GetSetting("Printer0_Name", "(默认值)"), "(默认值)");
         check("注释项 Printer1_Name", Config::GetSetting("Printer1_Name", "(默认值)"), "(默认值)");
         check("不存在的键", Config::GetSetting("NoSuchKey", "(默认值)"), "(默认值)");
-
-        // ---------------- 离线 .lic 数据链路 ----------------
-        append("\r\n---- 离线 .lic ----\r\n");
-
-        const std::string licData = Get(v, "lic_data");
-        const std::string licSig = Get(v, "lic_sig");
-        const std::string licSigTampered = Get(v, "lic_sig_tampered");
-
-        // 1) 验签 + 解密（与真实离线激活同一代码路径）
-        std::string licPlain = Crypto::DecryptLicenseFile(licData, licSig, secret);
-        check("lic 验签+解密", licPlain.empty() ? "(失败)" : "(成功)", "(成功)");
-
-        // 2) 解密后的内容解析与字段校验
-        JsonValue licJson = JsonValue::Parse(licPlain);
-        const JsonValue* licKeyNode = licJson.Find("license_key");
-        const JsonValue* licMcNode = licJson.Find("machine_code");
-        const JsonValue* licExpNode = licJson.Find("expires_at");
-
-        check("lic license_key", licKeyNode ? licKeyNode->ToConvertString() : "(缺失)",
-              Get(v, "lic_key_expected"));
-        check("lic expires_at", licExpNode ? licExpNode->ToConvertString() : "(缺失)",
-              Get(v, "lic_expires_expected"));
-        // 3) 签名被篡改必须拒绝
-        check("lic 篡改签名被拒绝",
-              Crypto::DecryptLicenseFile(licData, licSigTampered, secret).empty() ? "rejected" : "accepted",
-              "rejected");
-
-        // 4) 新旧 .lic 格式识别（v/enc/data/sig）
-        {
-            JsonValue v1 = JsonValue::Parse("{\"v\":1,\"enc\":true,\"data\":\"x\",\"sig\":\"y\"}");
-            bool isV1 = (v1.type == JsonValue::OBJ) && v1.Has("v") && v1.Has("enc") &&
-                        v1.Has("data") && v1.Has("sig");
-            check("lic 新版格式识别", isV1 ? "v1" : "not-v1", "v1");
-
-            JsonValue legacy = JsonValue::Parse("{\"license_key\":\"a\",\"machine_code\":\"b\"}");
-            bool legacyAsV1 = (legacy.type == JsonValue::OBJ) && legacy.Has("v") &&
-                              legacy.Has("enc") && legacy.Has("data") && legacy.Has("sig");
-            check("lic 旧版格式识别", legacyAsV1 ? "v1" : "legacy", "legacy");
-        }
     }
 
     append("\r\n=========== 结果: %s (失败 %d 项) ===========\r\n",
@@ -741,11 +660,8 @@ int RunServiceSelfTest(const std::wstring& reportPath)
               std::to_string(exitCode));
 
         std::string log = Log::ReadTodayLog();
-        bool licenseBlocked = log.find("启动校验未通过，服务启动被阻止") != std::string::npos;
-        bool noPrinterBlocked = log.find("没有配置任何打印机，服务启动失败") != std::string::npos;
-
-        check("记录了阻止原因", licenseBlocked || noPrinterBlocked,
-              licenseBlocked ? "启动校验未通过" : (noPrinterBlocked ? "没有配置任何打印机" : "未找到"));
+        const bool noPrinterBlocked = log.find("没有配置任何打印机，服务启动失败") != std::string::npos;
+        check("记录了阻止原因", noPrinterBlocked, noPrinterBlocked ? "没有配置任何打印机" : "未找到");
     }
     else
     {

@@ -57,13 +57,13 @@ enum class Icon
     Trash,          // 清空
     Check,          // 勾
     Copy,           // 复制
-    Shield,         // 授权 / 安全
+    Shield,         // 安全 / 防护
     Clock,          // 等待
     Warning,        // 警告
     Info,           // 提示
     Play,           // 启动
     Stop,           // 停止
-    Key,            // 授权码
+    Key,            // 密钥
 };
 
 void DrawIcon(HDC hdc, Icon icon, const RECT& rc, COLORREF color, BYTE alpha = 255);

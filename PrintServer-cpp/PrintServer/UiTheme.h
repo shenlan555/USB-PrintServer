@@ -46,7 +46,7 @@ const COLORREF kNavHover = RGB(234, 241, 255);    // #EAF1FF
 const COLORREF kNavFootBack = RGB(239, 245, 255); // #EFF5FF
 const COLORREF kNavFootText = RGB(91, 112, 147);  // #5B7093
 
-// 授权窗口头部（浅蓝白 + 顶部主色横条，不出现深色大块）
+// 对话框头部（浅蓝白 + 顶部主色横条，不出现深色大块）
 const COLORREF kHeadBack = RGB(245, 249, 255);    // #F5F9FF
 const COLORREF kHeadBorder = RGB(226, 234, 246);  // #E2EAF6
 
@@ -182,7 +182,7 @@ void DrawCardShadows(HDC hdc, HWND owner = nullptr);
 
 // 卡片表面登记：落在 cardRect 内的控件其背景刷使用 surface（供 OnCtlColor 使用）。
 // parent 用于把登记限定在某个对话框内：同一进程可同时存在多个对话框（如主窗口
-// 模态打开授权窗口），不限定时坐标相近的另一对话框会冲掉登记或被误匹配。
+// 模态打开子对话框），不限定时坐标相近的另一对话框会冲掉登记或被误匹配。
 void RegisterSurface(const RECT& cardRect, COLORREF surface, HWND parent = nullptr);
 void ClearSurfaces(HWND parent = nullptr);
 bool TryGetSurfaceColor(HWND control, COLORREF& surface);

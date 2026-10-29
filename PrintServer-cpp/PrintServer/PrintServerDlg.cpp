@@ -14,7 +14,6 @@
 
 #include "BuildConfig.h"
 #include "Config.h"
-#include "LicenseHelper.h"
 #include "LogHelper.h"
 #include "Program.h"
 #include "UiGdiPlus.h"

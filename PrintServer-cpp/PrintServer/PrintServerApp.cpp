@@ -4,7 +4,6 @@
 #include "TrayAppContext.h"
 #include "ServiceHost.h"
 #include "Program.h"
-#include "LicenseHelper.h"
 #include "PrintServerDlg.h"
 #include "LogHelper.h"
 #include "Config.h"
@@ -39,12 +38,6 @@ std::wstring ToLowerInvariant(const std::wstring& text)
     std::wstring result = text;
     ::CharLowerBuffW(&result[0], (DWORD)result.size());
     return result;
-}
-
-// 启动门禁：本版本无授权校验，恒通过
-bool CheckLicense()
-{
-    return true;
 }
 
 } // namespace
@@ -169,8 +162,6 @@ BOOL CPrintServerApp::InitInstance()
                              ICC_PROGRESS_CLASS | ICC_DATE_CLASSES | ICC_BAR_CLASSES;
             ::InitCommonControlsEx(&controls);
 
-            ps::License::Initialize();
-
             ps::CPrintServerDlg dialog;
             m_pMainWnd = &dialog;
             dialog.DoModal();
@@ -196,13 +187,6 @@ BOOL CPrintServerApp::InitInstance()
     }
 
     // ========== 管理员权限已确认，执行正常流程 ==========
-
-    // 初始化授权状态（本版本恒为已授权，仅用于界面展示）
-    ps::License::Initialize();
-    ps::License::SetStatusChangedHandler(
-        [](ps::License::Status /*status*/) {
-            // 状态变化日志点
-        });
 
     // 处理命令行参数
     if (!args.empty())
@@ -247,13 +231,6 @@ BOOL CPrintServerApp::InitInstance()
     {
         ::CloseHandle(guiMutex);
         ::MessageBoxW(nullptr, L"打印服务器已经在运行中！", L"提示", MB_OK | MB_ICONINFORMATION);
-        return FALSE;
-    }
-
-    // 启动门禁（本版本恒通过）
-    if (!CheckLicense())
-    {
-        ::CloseHandle(guiMutex);
         return FALSE;
     }
 

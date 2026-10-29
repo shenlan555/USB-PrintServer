@@ -6,7 +6,7 @@
 // AutoLog 语义：启动/停止时写一条 Application 日志。
 //
 // 启动流程（严格对应 C# OnStart）：
-//   1. LicenseHelper.StartValidation()  → 失败则写事件日志、退出码 1066、停止服务
+//   1. 未配置任何打印机 → 写事件日志、退出码 1066、停止服务
 //   3. ConfigurationHelper.GetPrinterConfigs() → 为空则写事件日志、退出码 1066、停止服务
 //   4. 每台打印机起一个 TcpPrintServer 线程
 //   5. 启动 HttpApiServer（端口取 App.config 的 ApiPort，默认 9180）
@@ -62,7 +62,7 @@ private:
     std::unique_ptr<HttpApiServer> m_apiServer;
     std::shared_ptr<IppServer> m_ippServer;     // 与 RAW 并行的 IPP 服务
 
-    // 对应 C# OnStart 中 this.ExitCode 的赋值（未授权/无配置时为 1066）
+    // 对应 C# OnStart 中 this.ExitCode 的赋值（无可用配置时为 1066）
     DWORD m_exitCode;
 
     static ServiceHost* s_instance;
