@@ -2,8 +2,8 @@
 
 // 轻量 JSON 实现
 //
-// 目的：替代 C# 的 System.Web.Script.Serialization.JavaScriptSerializer，
-//       用于授权协议收发与本地缓存，序列化格式刻意与其保持一致：
+// 目的：轻量、零依赖的 JSON 编解码，供 HTTP API 与 IPP 服务使用。
+//       序列化格式与 .NET 的 JavaScriptSerializer 保持一致：
 //         - 不输出多余空白
 //         - 字符串转义 "" \\ \b \f \n \r \t 及 0x00-0x1F 为 \u00XX
 //         - 额外转义 < > & ' 为 \u003c \u003e \u0026 \u0027（JavaScriptSerializer 的行为）

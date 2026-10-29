@@ -369,7 +369,7 @@ void IppServer::Log(const std::string& message)
     std::string line = "[IPP] " + message;
 
     // 宿主（服务模式 / GUI）负责写文件与事件日志；这里再写一次会导致
-    // 每条 IPP 日志重复两遍（1.4.2 修复）。没有 OnLog 时才自己落盘。
+    // 每条 IPP 日志重复两遍（已修复）。没有 OnLog 时才自己落盘。
     if (OnLog)
     {
         OnLog(line);
@@ -1114,7 +1114,7 @@ void IppServer::DispatchOperation(const Ipp::Request& request, const std::string
     builder.EndAttributes();
     responseBytes = builder.Bytes();
     // 用 builder 的真实状态：handler 内部可能已替换为错误响应，
-    // 这里若写死 Ok，日志就会把失败记录成成功（1.4.2 修复）。
+    // 这里若写死 Ok，日志就会把失败记录成成功（已修复）。
     ippStatusOut = builder.Status();
 
     {
@@ -1333,7 +1333,7 @@ void IppServer::AddPrinterAttributes(Ipp::ResponseBuilder& builder, int printerI
     builder.AddKeyword("identify-actions-default", "display");
     builder.AddKeyword("identify-actions-supported", "display");
 
-    // ==== RFC 8011 / IPP Everywhere 常用属性（1.4.2 补齐）====
+    // ==== RFC 8011 / IPP Everywhere 常用属性（已补齐）====
     builder.AddKeyword("which-jobs-supported", "completed");
     builder.AddKeyword("which-jobs-supported", "not-completed");
     builder.AddKeyword("which-jobs-supported", "all");

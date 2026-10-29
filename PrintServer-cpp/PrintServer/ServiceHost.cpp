@@ -229,7 +229,7 @@ void ServiceHost::OnStart()
         bool licensed = License::StartValidation();
         if (!licensed)
         {
-            std::string errorMsg = "授权验证失败，服务启动被阻止。状态: " + License::GetStatusText();
+            std::string errorMsg = "启动校验未通过，服务启动被阻止。状态: " + License::GetStatusText();
             WriteEventLog(errorMsg, true);
             Log::WriteLog("[授权] " + errorMsg);
 
@@ -251,7 +251,10 @@ void ServiceHost::OnStart()
             return;
         }
 
-        Log::WriteLog("[授权] 服务启动，授权验证通过 - " + License::CurrentLicenseKey());
+        {
+            const std::string key = License::CurrentLicenseKey();
+            Log::WriteLog("[服务] 启动校验通过" + (key.empty() ? std::string() : (" - " + key)));
+        }
 
         std::string addresses;
         {

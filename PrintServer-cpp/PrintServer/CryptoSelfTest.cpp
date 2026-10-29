@@ -196,9 +196,8 @@ int RunCryptoSelfTest(const std::wstring& vectorFilePath, const std::wstring& re
         check("本地 AES 往返", Crypto::AesDecryptFromBase64(Crypto::AesEncryptToBase64(aesPlain)), aesPlain);
 
         // DPAPI 作用域：必须写成"本机作用域"。
-        // 界面程序以登录用户身份运行、服务以 LocalSystem 身份运行，两者共用同一份
-        // license.dat；用户作用域的密文在另一账户下无法解密，会导致离线校验失败
-        // （授权服务器不可达时服务会直接启动失败）。
+        // 界面程序以登录用户身份运行、服务以 LocalSystem 身份运行，两者可能共用同一份
+        // 本地密文；用户作用域的密文在另一账户下无法解密。
         // DPAPI v1 密文头部 offset 40 记录作用域标志，CRYPTPROTECT_LOCAL_MACHINE = 0x4。
         {
             std::vector<unsigned char> blob;
@@ -735,22 +734,22 @@ int RunServiceSelfTest(const std::wstring& reportPath)
 
     if (exitCode != 0)
     {
-        // 未授权或未配置打印机 → 服务必须拒绝启动（对应 C# OnStart 的两处 return）
+        // 启动门禁未通过或未配置打印机 → 服务必须拒绝启动（OnStart 的两处 return）
         append("启动被拒绝，退出码 = %lu\r\n\r\n", (unsigned long)exitCode);
 
         check("启动被阻止时退出码为 1066（与 C# 一致）", exitCode == 1066,
               std::to_string(exitCode));
 
         std::string log = Log::ReadTodayLog();
-        bool licenseBlocked = log.find("授权验证失败，服务启动被阻止") != std::string::npos;
+        bool licenseBlocked = log.find("启动校验未通过，服务启动被阻止") != std::string::npos;
         bool noPrinterBlocked = log.find("没有配置任何打印机，服务启动失败") != std::string::npos;
 
         check("记录了阻止原因", licenseBlocked || noPrinterBlocked,
-              licenseBlocked ? "授权验证失败" : (noPrinterBlocked ? "没有配置任何打印机" : "未找到"));
+              licenseBlocked ? "启动校验未通过" : (noPrinterBlocked ? "没有配置任何打印机" : "未找到"));
     }
     else
     {
-        check("服务启动成功（授权通过且有打印机配置）", true);
+        check("服务启动成功（门禁通过且有打印机配置）", true);
         check("配置中存在启用的打印机", !configs.empty(),
               std::to_string(configs.size()) + " 台");
 
@@ -829,7 +828,7 @@ int RunServiceSelfTest(const std::wstring& reportPath)
         ServiceHost host2;
         DWORD code2 = host2.StartStandalone();
 
-        check("有授权 + 有打印机配置时服务启动成功", code2 == 0,
+        check("有打印机配置时服务启动成功", code2 == 0,
               "退出码 " + std::to_string(code2));
 
         size_t sentA = 0;

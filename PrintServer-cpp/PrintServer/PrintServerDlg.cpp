@@ -1703,7 +1703,7 @@ bool CPrintServerDlg::IsVirtualPrinter(const std::string& printerName, const std
 void CPrintServerDlg::ReallocatePorts()
 {
     // 端口与打印机绑定，取消勾选只改变"是否共享"，不清空端口：
-    // 取消后再勾回来，端口与 IPP 端点仍是原来的（1.4.2 修复端口错乱）。
+    // 取消后再勾回来，端口与 IPP 端点仍是原来的（修复了端口错乱）。
     // 槽位由端口推导（端口 - 9100），因此 RAW 9100+i 与 /ipp/print/i 始终对应。
     const int basePort = 9100;
 
@@ -1940,7 +1940,7 @@ void CPrintServerDlg::UpdateServiceStatus()
 void CPrintServerDlg::UpdateLicenseStatus()
 {
     // 页面标题行只放两个胶囊：授权状态（含有效期）+ 服务状态。
-    // 有效期的完整文案在授权窗口里，这里压成短后缀以免胶囊过长。
+    // 有效期的完整文案在授权信息页里，这里压成短后缀以免胶囊过长。
     License::Status status = License::CurrentStatus();
 
     std::wstring text = Utf8ToWide(License::GetStatusText());

@@ -1,10 +1,9 @@
 #pragma once
 
-// 授权系统 —— 开源免费版存根
+// 授权接口
 //
-// 原商业授权逻辑（在线/离线激活、联网验证、license.dat 缓存、机器码采集、
-// 定时复验）已全部移除，本文件只保留主界面与服务宿主所需的最小接口，
-// 状态恒为 Licensed（免费版）。
+// 主界面与服务宿主只依赖这里的接口，具体实现见 LicenseHelper.cpp。
+// 本版本不带联网校验与授权文件：状态恒为 Licensed（有效期视为永久）。
 
 #include <string>
 #include <functional>
@@ -30,12 +29,12 @@ using StatusChangedHandler = std::function<void(Status)>;
 
 void Initialize();
 
-// 恒返回 true（免费版无需授权验证）
+// 恒返回 true（本版本无授权校验）
 bool StartValidation();
 
 void StopValidation();
 
-// 恒返回 true（免费版无需授权验证）
+// 恒返回 true（本版本无授权校验）
 bool ManualCheck();
 
 void SetStatusChangedHandler(StatusChangedHandler handler);

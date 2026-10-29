@@ -41,7 +41,7 @@ std::wstring ToLowerInvariant(const std::wstring& text)
     return result;
 }
 
-// 开源免费版：无授权门禁，恒通过（原 CheckLicense 已随授权系统移除）
+// 启动门禁：本版本无授权校验，恒通过
 bool CheckLicense()
 {
     return true;
@@ -73,8 +73,8 @@ BOOL CPrintServerApp::InitInstance()
 
 #ifdef _DEBUG
     // ===== 以下命令行自检开关仅存在于 Debug 构建；Release 交付版已剥离 =====
-    // 原因：/guitest 会跳过管理员检查与授权门禁，/svctest 会跳过授权直接启动服务，
-    //       留在交付版等于提供免授权运行的后门。
+    // 原因：/guitest 会跳过管理员检查与启动门禁，/svctest 会跳过校验直接启动服务，
+    //       留在交付版等于留下一条绕过管理员检查的入口。
     // -------- 命令行自检模式（不显示界面，仅供开发与现场诊断）--------
     if (!args.empty())
     {
@@ -180,7 +180,7 @@ BOOL CPrintServerApp::InitInstance()
 #endif // _DEBUG
 
     // ========== 模式判断 ==========
-    // 托盘助手模式：不需要管理员权限、不需要反调试/授权
+    // 托盘助手模式：不需要管理员权限，也不做启动门禁
     if (!args.empty() &&
         (EqualsIgnoreCase(args[0], L"/tray") || EqualsIgnoreCase(args[0], L"-tray")))
     {
@@ -197,11 +197,11 @@ BOOL CPrintServerApp::InitInstance()
 
     // ========== 管理员权限已确认，执行正常流程 ==========
 
-    // 初始化授权系统
+    // 初始化授权状态（本版本恒为已授权，仅用于界面展示）
     ps::License::Initialize();
     ps::License::SetStatusChangedHandler(
         [](ps::License::Status /*status*/) {
-            // 对应 C# 的 OnLicenseStatusChanged（当前仅作为扩展日志点）
+            // 状态变化日志点
         });
 
     // 处理命令行参数
@@ -250,7 +250,7 @@ BOOL CPrintServerApp::InitInstance()
         return FALSE;
     }
 
-    // 强制授权验证
+    // 启动门禁（本版本恒通过）
     if (!CheckLicense())
     {
         ::CloseHandle(guiMutex);

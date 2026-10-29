@@ -1,6 +1,6 @@
 // PDF 栅格化（Phase B：IPP 免驱打印）
 //
-// 1.4.2 起改用 PDFium（Chrome/Edge 同款 PDF 引擎，BSD-3-Clause）渲染：
+// 改用 PDFium（Chrome/Edge 同款 PDF 引擎，BSD-3-Clause）渲染：
 //   原来用 Windows.Data.Pdf，小字与细线偏软，打印后轮廓发虚；
 //   PDFium 的字形渲染与 Adobe Reader 接近，600 dpi 输出基本等同 USB 直打。
 //

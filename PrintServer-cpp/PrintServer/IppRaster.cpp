@@ -293,7 +293,7 @@ bool BuildXpsPackageFromProvider(size_t pageCount, const PageProvider& provider,
         // 页面部件位于 Documents/1/Pages/，图片位于包根 Resources/。
         // 这里必须用"相对本部件"的 URI（../../../Resources/...）：
         // 写成包根绝对路径 "/Resources/..." 时，XpsPrint 的 XAML 解析器
-        // 找不到资源，页面会被渲染成纯白（1.4.2 修复）。
+        // 找不到资源，页面会被渲染成纯白（已修复）。
         const std::string imageSource = "../../../" + imagePart;
 
         ok = ok && ZipAddText(zip, pagePart.c_str(),

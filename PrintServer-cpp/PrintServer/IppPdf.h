@@ -2,16 +2,16 @@
 
 // PDF 栅格化（Phase B：免驱打印）
 //
-// 1.4.2 起用 PDFium（BSD-3-Clause，动态加载 pdfium.dll）把 PDF 渲染成位图，
+// 1.4.3 用 PDFium（BSD-3-Clause，动态加载 pdfium.dll）把 PDF 渲染成位图，
 // 再交给 IppRaster 走 GDI 输出到本地驱动 → 打印机。
-// （原实现用 Windows.Data.Pdf，小字偏软，已替换。）
+// （早期版本用 Windows.Data.Pdf，小字偏软，已替换。）
 //
 // 意义：Windows 10/11 的 "Microsoft IPP Class Driver"、macOS/iOS 的 AirPrint、
 //       安卓的 Mopria，发来的首选格式就是 PDF。支持 PDF 后客户端**无需安装
 //       厂商驱动**，现有"抓驱动包 + 数字签名 + 提权安装"那条链路退化为兜底。
 //
 // 依赖取舍：只用系统自带能力 —— 不引入 Ghostscript / MuPDF / Poppler
-//           （它们分别是 AGPL / AGPL / GPL，闭源商业分发需要购买授权）。
+//           （它们的许可证为 AGPL / AGPL / GPL，与本项目的 MIT 许可不兼容）。
 //
 // 限制：Win7/2008 系统不带 PDF 栅格化器，此时只能宣告 PDL 直通格式。
 

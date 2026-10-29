@@ -64,7 +64,7 @@ IDI_APPICON             ICON                    "res\\appicon.ico"
 // 该样式在 OnInitDialog 中移除，否则客户区是 544x631 而非 WinForms 的 554x641
 IDD_MAIN_DIALOG DIALOGEX 0, 0, 375, 348
 STYLE DS_SETFONT | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
-CAPTION "PrintServer v1.4.2"
+CAPTION "PrintServer v1.4.3"
 FONT 9, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
 END
@@ -106,8 +106,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,4,2,0
- PRODUCTVERSION 1,4,2,0
+ FILEVERSION 1,4,3,0
+ PRODUCTVERSION 1,4,3,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -124,12 +124,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "浪里个浪"
             VALUE "FileDescription", "网络打印服务器"
-            VALUE "FileVersion", "1.4.2"
+            VALUE "FileVersion", "1.4.3"
             VALUE "InternalName", "PrintServer"
             VALUE "LegalCopyright", "Copyright (C) 2026 挨踢日记"
             VALUE "OriginalFilename", "PrintServer.exe"
             VALUE "ProductName", "网络打印服务器"
-            VALUE "ProductVersion", "1.4.2"
+            VALUE "ProductVersion", "1.4.3"
         END
     END
     BLOCK "VarFileInfo"

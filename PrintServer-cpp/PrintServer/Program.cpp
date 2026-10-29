@@ -221,16 +221,16 @@ std::string GetDisplayVersion()
     DWORD handle = 0;
     DWORD size = ::GetFileVersionInfoSizeW(path.c_str(), &handle);
     if (size == 0)
-        return "1.4.2";
+        return "1.4.3";
 
     std::vector<unsigned char> data(size);
     if (!::GetFileVersionInfoW(path.c_str(), 0, size, data.data()))
-        return "1.4.2";
+        return "1.4.3";
 
     VS_FIXEDFILEINFO* fixed = nullptr;
     UINT fixedLen = 0;
     if (!::VerQueryValueW(data.data(), L"\\", (LPVOID*)&fixed, &fixedLen) || fixed == nullptr)
-        return "1.4.2";
+        return "1.4.3";
 
     int major = (int)HIWORD(fixed->dwFileVersionMS);
     int minor = (int)LOWORD(fixed->dwFileVersionMS);

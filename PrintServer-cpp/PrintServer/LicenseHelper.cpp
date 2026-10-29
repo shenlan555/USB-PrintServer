@@ -3,8 +3,8 @@
 
 #include <mutex>
 
-// 授权系统 —— 开源免费版存根实现
-// 原商业授权逻辑已整体移除：不联网、不采集硬件指纹、不生成任何本地授权文件。
+// 授权接口的默认实现：不联网、不采集硬件信息、不读写授权文件，
+// 状态恒为 Licensed、有效期视为永久。
 
 namespace ps
 {
@@ -19,12 +19,12 @@ StatusChangedHandler g_statusChangedHandler;
 
 void Initialize()
 {
-    // 免费版：无需初始化授权上下文
+    // 无授权上下文需要初始化
 }
 
 bool StartValidation()
 {
-    return true; // 免费版：启动即视为已授权
+    return true;
 }
 
 void StopValidation()
@@ -33,7 +33,7 @@ void StopValidation()
 
 bool ManualCheck()
 {
-    return true; // 免费版：无需授权验证
+    return true;
 }
 
 void SetStatusChangedHandler(StatusChangedHandler handler)
@@ -49,7 +49,7 @@ Status CurrentStatus()
 
 std::string CurrentLicenseKey()
 {
-    return std::string(); // 免费版无授权码
+    return std::string();
 }
 
 std::string LicenseExpiry()
@@ -59,17 +59,17 @@ std::string LicenseExpiry()
 
 bool HasLocalLicenseFile()
 {
-    return true; // 免费版：无 license.dat 概念
+    return true; // 不存在本地授权文件
 }
 
 void ForceLicenseReactivation()
 {
-    // 免费版：无授权状态可重置
+    // 无授权状态可重置
 }
 
 std::string GetStatusText()
 {
-    return "免费版（无需授权）";
+    return "已授权";
 }
 
 std::string GetLicenseExpiryText()

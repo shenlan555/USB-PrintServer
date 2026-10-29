@@ -25,8 +25,8 @@ inline const char* Description =
     "\xE8\x87\xAA\xE5\x8A\xA8\xE5\x8F\x91\xE7\x8E\xB0\xE3\x80\x81\xE4\xB8\x80\xE9\x94\xAE\xE5\xAE\x89\xE8\xA3\x85\xE3\x80\x81"
     "\xE5\x8D\xB3\xE8\xA3\x85\xE5\x8D\xB3\xE7\x94\xA8";
 
-// [assembly: AssemblyVersion("1.4.2")] —— 资源损坏时的兜底显示值
-inline const char* FallbackVersion = "1.4.2";
+// [assembly: AssemblyVersion("1.4.3")] —— 资源损坏时的兜底显示值
+inline const char* FallbackVersion = "1.4.3";
 
 // 默认 API 端口（对应 C# NumericUpDown.Value = 9180）
 inline const int DefaultApiPort = 9180;

@@ -66,7 +66,7 @@ bool PrintRasterPages(const std::string& printerNameUtf8, const std::vector<Rast
                       const std::string& documentName, std::string& error);
 
 // ===========================================================================
-// GDI 位图打印（默认路径，1.4.2 起优先使用）
+// GDI 位图打印（默认路径，优先使用）
 // ===========================================================================
 // 直接用打印机 DC 画位图（StretchDIBits），不经过 XPS 部件/资源 URI 解析：
 //   - 对 v3/v4 驱动、各类厂商驱动都有效，兼容性比 XpsPrint 管线宽得多
