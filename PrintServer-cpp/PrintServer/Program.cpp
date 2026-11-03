@@ -6,6 +6,7 @@
 
 #include <winsvc.h>
 
+#include "Firewall.h"
 #include "LogHelper.h"
 #include "Wmi.h"
 
@@ -214,6 +215,32 @@ std::wstring GetExecutablePath()
     return std::wstring(buffer, len);
 }
 
+// 服务以 LocalSystem 身份运行，系统不会弹「是否允许访问网络」：
+// 入站被拦时客户端既扫不到 9180，也连不上 9100/631，表现为「完全没反应」。
+// 安装/启动时把放行规则补上，避免用户手工配置防火墙。
+void EnsureFirewallRules()
+{
+    if (!ps::Firewall::IsElevated())
+        return;
+
+    ps::Firewall::Result program = ps::Firewall::EnsureProgramRule(GetExecutablePath());
+    if (program.ok)
+    {
+        Log::WriteLog("[防火墙] " + program.detail + "（程序放行: " +
+                      ps::WideToUtf8(GetExecutablePath()) + "）");
+    }
+    else
+    {
+        Log::WriteLog("[防火墙] " + program.detail);
+    }
+
+    ps::Firewall::Result ports = ps::Firewall::EnsureTcpPortsRule(L"631,9100-9199");
+    if (ports.ok)
+        Log::WriteLog("[防火墙] " + ports.detail + "（TCP 631, 9100-9199）");
+    else
+        Log::WriteLog("[防火墙] " + ports.detail);
+}
+
 std::string GetDisplayVersion()
 {
     std::wstring path = GetExecutablePath();
@@ -221,16 +248,16 @@ std::string GetDisplayVersion()
     DWORD handle = 0;
     DWORD size = ::GetFileVersionInfoSizeW(path.c_str(), &handle);
     if (size == 0)
-        return "1.4.3";
+        return "1.4.4";
 
     std::vector<unsigned char> data(size);
     if (!::GetFileVersionInfoW(path.c_str(), 0, size, data.data()))
-        return "1.4.3";
+        return "1.4.4";
 
     VS_FIXEDFILEINFO* fixed = nullptr;
     UINT fixedLen = 0;
     if (!::VerQueryValueW(data.data(), L"\\", (LPVOID*)&fixed, &fixedLen) || fixed == nullptr)
-        return "1.4.3";
+        return "1.4.4";
 
     int major = (int)HIWORD(fixed->dwFileVersionMS);
     int minor = (int)LOWORD(fixed->dwFileVersionMS);
@@ -380,6 +407,10 @@ void InstallService()
     {
         ShellRunAndWait(L"sc", L"description PrintServer \"将本地打印机共享为网络打印机\"",
                         false, exitCode, lastError);
+
+        // 先放行入站，再启动服务：否则服务起来后局域网仍连不上（没有任何提示）
+        EnsureFirewallRules();
+
         ShellRunAndWait(L"sc", L"start PrintServer", false, exitCode, lastError);
 
         SetTrayAutoStart(true);

@@ -14,6 +14,7 @@
 
 #include "BuildConfig.h"
 #include "Config.h"
+#include "Firewall.h"
 #include "LogHelper.h"
 #include "Program.h"
 #include "UiGdiPlus.h"
@@ -2090,6 +2091,15 @@ void CPrintServerDlg::StartServer()
     LogToTextBox("打印服务器启动 - 主机:" + std::string(hostName) + "  IP:" + joined);
     LogToTextBox("正在启动 " + std::to_string(configs.size()) + " 台打印机...");
 
+    // 放行入站端口：否则局域网客户端扫不到也连不上（服务模式不会弹放行提示）
+    {
+        ps::Firewall::Result programRule = ps::Firewall::EnsureProgramRule(
+            ps::ProgramHost::GetExecutablePath());
+        ps::Firewall::Result portRule = ps::Firewall::EnsureTcpPortsRule(L"631,9100-9199");
+        LogToTextBox(std::string("[防火墙] ") + programRule.detail);
+        LogToTextBox(std::string("[防火墙] ") + portRule.detail + "（TCP 631, 9100-9199）");
+    }
+
     HWND hwnd = GetSafeHwnd();
 
     try
@@ -2785,6 +2795,15 @@ void CPrintServerDlg::BtnInstallService()
         RunCmd(L"sc", L"description PrintServer \"将本地打印机共享为网络打印机\"", false);
         RunCmd(L"sc", L"failure PrintServer reset= 86400 actions= restart/60000/restart/60000/restart/60000",
                false);
+
+        // 本机若还开着「服务器」模式，9100/631/9180 都握在 GUI 进程手里：
+        // Windows 允许 SO_REUSEADDR 重绑定，服务会「启动成功」却收不到任何连接。
+        if (m_isRunning)
+        {
+            LogToTextBox("安装服务前先停止本机服务器模式，避免端口被占用");
+            StopServer();
+            ::Sleep(300);
+        }
 
         LogToTextBox("执行: sc start PrintServer");
         ::Sleep(500);

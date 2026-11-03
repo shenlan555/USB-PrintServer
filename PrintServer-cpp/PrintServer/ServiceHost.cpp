@@ -5,6 +5,8 @@
 #include <vector>
 #include <stdexcept>
 
+#include "Firewall.h"
+#include "Program.h"
 #include "LogHelper.h"
 #include "Config.h"
 
@@ -237,6 +239,16 @@ void ServiceHost::OnStart()
 
         Log::WriteLog("[服务] 已启动，共 " + std::to_string(configs.size()) + " 台打印机");
 
+        // 服务账户不会弹防火墙提示，入站默认被拦；这里补放行规则（失败只记日志）
+        {
+            ps::Firewall::Result programRule =
+                ps::Firewall::EnsureProgramRule(ps::ProgramHost::GetExecutablePath());
+            Log::WriteLog("[防火墙] " + programRule.detail);
+
+            ps::Firewall::Result portRule = ps::Firewall::EnsureTcpPortsRule(L"631,9100-9199");
+            Log::WriteLog("[防火墙] " + portRule.detail + "（TCP 631, 9100-9199）");
+        }
+
         std::string addresses;
         {
             std::vector<std::string> all = NetworkHelper::GetAllNetworkAddresses();
@@ -330,6 +342,9 @@ void ServiceHost::OnStart()
         // 原生实现选择向 SCM 上报失败（退出码非 0）后干净退出，
         // 避免弹出「程序已停止工作」崩溃对话框，SCM 观察到的结果一致。
         m_exitCode = kErrorServiceSpecificError;
+
+        // 已经起来的监听器要收干净，否则服务退出后端口仍被占用
+        OnStop();
     }
 }
 

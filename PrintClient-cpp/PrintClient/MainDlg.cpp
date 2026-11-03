@@ -1012,11 +1012,11 @@ LRESULT CMainDlg::OnScanDone(WPARAM, LPARAM lParam)
             SetConnectStatus(message, kStatusGreen);
 
             // 扫描到后自动连接第一台服务器，显示打印机信息
-            ConnectToServer(done->results[0].ipAddress, ReadApiPort());
+            ConnectToServer(done->results[0].ipAddress, done->results[0].apiPort > 0 ? done->results[0].apiPort : ReadApiPort());
         }
         else
         {
-            SetConnectStatus(L"未发现打印服务器，请手动输入地址", kStatusOrange);
+            SetConnectStatus(L"未发现打印服务器：确认服务端已启动、防火墙已放行 9180/9100，或手动输入 IP", kStatusOrange);
         }
     }
     catch (const std::exception& ex)

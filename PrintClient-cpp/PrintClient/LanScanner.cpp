@@ -285,7 +285,13 @@ std::vector<ScanResult> ScanAsync(int apiPort, const ScanProgressFn& progress)
                     std::string ip = network.subnet + std::to_string(i);
 
                     batch.push_back(std::thread([&, ip]() {
-                        if (!TryConnect(ip, apiPort))
+                        // 先试客户端填写的端口，再回退默认 9180：服务端改过 ApiPort 时默认端口扫不到
+                        int foundPort = 0;
+                        if (TryConnect(ip, apiPort))
+                            foundPort = apiPort;
+                        else if (apiPort != 9180 && TryConnect(ip, 9180))
+                            foundPort = 9180;
+                        if (foundPort == 0)
                             return;
 
                         {
@@ -293,7 +299,7 @@ std::vector<ScanResult> ScanAsync(int apiPort, const ScanProgressFn& progress)
                             ScanResult result;
                             result.ipAddress = ip;
                             result.isReachable = true;
-                            result.apiPort = apiPort;
+                            result.apiPort = foundPort;
                             results.push_back(result);
                         }
 

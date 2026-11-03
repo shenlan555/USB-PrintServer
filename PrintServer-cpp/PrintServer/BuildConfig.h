@@ -7,7 +7,7 @@ namespace ps
 namespace BuildConfig
 {
     // 版本号（须与 PrintServer.rc 的 VS_VERSION_INFO 保持一致）
-    inline constexpr const char* VersionA = "1.4.3";
+    inline constexpr const char* VersionA = "1.4.4";
 
     // 产品元数据
     inline constexpr const char* ProductName = "网络打印服务器";
