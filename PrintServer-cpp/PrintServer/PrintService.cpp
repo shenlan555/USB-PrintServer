@@ -685,6 +685,8 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
         sockaddr_storage peer;
         memset(&peer, 0, sizeof(peer));
         int peerLen = sizeof(peer);
+        unsigned short peerPort = 0;
+        const ULONGLONG startedAt = ::GetTickCount64();
 
         if (::getpeername(clientSocket, (sockaddr*)&peer, &peerLen) == 0)
         {
@@ -700,11 +702,16 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
                 ::inet_ntop(AF_INET, &a4->sin_addr, text, sizeof(text));
             }
             clientAddress = text;
+
+            const unsigned short rawPort = (peer.ss_family == AF_INET6)
+                ? ((sockaddr_in6*)&peer)->sin6_port
+                : ((sockaddr_in*)&peer)->sin_port;
+            peerPort = ::ntohs(rawPort);
         }
 
         // 反查主机会阻塞在 DNS 上（局域网常见数秒无响应），必须放到读取之后：
         // 否则驱动等不到响应会直接复位连接，日志里只剩「接收数据失败 10054」。
-        Log("收到连接: " + clientAddress);
+        Log("收到连接: " + clientAddress + ":" + std::to_string(peerPort));
 
         // 从配置读取接收超时（秒），默认 30 秒
         int timeoutSec = atoi(ConfigHelper::GetSetting("ReceiveTimeout", "30").c_str());
@@ -751,7 +758,9 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
         {
             // 驱动探测端口后直接复位连接：属于正常现象，不该当成错误刷日志
             int err = ::WSAGetLastError();
-            Log("客户端 " + clientAddress + " 提前断开（错误 " + std::to_string(err) + "，未收到数据）");
+            Log("客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 提前断开（错误 " +
+                std::to_string(err) + "，未收到数据，" +
+                std::to_string(::GetTickCount64() - startedAt) + " ms）");
             ::DeleteFileW(tempFile.c_str());
             RemoveActiveClient(clientSocketValue);
             return;
@@ -760,8 +769,9 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
         if (readFailed)
         {
             int err = ::WSAGetLastError();
-            Log("处理客户端 " + clientAddress + " 中断: 接收数据失败 (错误 " + std::to_string(err) +
-                ")，已收到 " + FormatSize(totalBytes) + "，放弃本作业");
+            Log("处理客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 中断: 接收数据失败 (错误 " +
+                std::to_string(err) + ")，已收到 " + FormatSize(totalBytes) + "，" +
+                std::to_string(::GetTickCount64() - startedAt) + " ms，放弃本作业");
             ::DeleteFileW(tempFile.c_str());
             RemoveActiveClient(clientSocketValue);
             return;
