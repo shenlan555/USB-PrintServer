@@ -65,13 +65,14 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
+      <MinimumRequiredVersion>6.01</MinimumRequiredVersion>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <!-- 调试符号不落在输出目录：只写 obj\（编译中间目录），
            发布目录里只有 exe/dll；需要分析崩溃转储时从 obj 取同名 pdb。 -->
       <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
       <!-- 主题化控件依赖（对应 C# Application.EnableVisualStyles 生成的 comctl32 6.0 激活上下文） -->
       <AdditionalManifestDependencies>type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'</AdditionalManifestDependencies>
-      <AdditionalDependencies>version.lib;winspool.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>version.lib;winspool.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <!-- 与 C# 原版一致：app.manifest 未声明 dpiAware（.NET WinForms 默认 DPI 非感知）。
@@ -105,6 +106,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
+      <MinimumRequiredVersion>6.01</MinimumRequiredVersion>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -113,7 +115,7 @@
       <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
       <!-- 主题化控件依赖（对应 C# Application.EnableVisualStyles 生成的 comctl32 6.0 激活上下文） -->
       <AdditionalManifestDependencies>type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'</AdditionalManifestDependencies>
-      <AdditionalDependencies>version.lib;winspool.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>version.lib;winspool.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <!-- 与 C# 原版一致：app.manifest 未声明 dpiAware（.NET WinForms 默认 DPI 非感知）。
