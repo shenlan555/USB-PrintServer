@@ -525,6 +525,63 @@ std::wstring UniqueTempPrnPath()
     return std::wstring(tempName) + L".prn";
 }
 
+// ---------------------------------------------------------------------------
+// PJL 状态查询
+//
+// 很多 Windows 驱动在真正发作业前，会先发一段 PJL 查询（INFO STATUS / USTATUS），
+// 等打印机回应后才开始流式发送数据。RAW 9100 服务器若不作答，驱动等不到回复就
+// 直接复位连接，服务端日志只剩「接收数据失败 10054」，作业数据一个字节都收不到。
+// 这里只应答「查询类」PJL；带 ENTER LANGUAGE / JOB 的是真作业，照常打印。
+// ---------------------------------------------------------------------------
+
+// 只认「查询类」PJL：INFO / USTATUS / ECHO / INQUIRE。
+// 普通作业里的 @PJL SET / ENTER LANGUAGE 不在此列，避免把作业当成查询吃掉。
+bool LooksLikePjlQuery(const std::vector<unsigned char>& head)
+{
+    if (head.size() < 8)
+        return false;
+
+    const std::string text(head.begin(), head.end());
+    return text.find("@PJL INFO") != std::string::npos ||
+           text.find("@PJL USTATUS") != std::string::npos ||
+           text.find("@PJL ECHO") != std::string::npos ||
+           text.find("@PJL INQUIRE") != std::string::npos;
+}
+
+bool IsRealPrintJob(const std::string& text)
+{
+    return text.find("ENTER LANGUAGE") != std::string::npos ||
+           text.find("@PJL JOB") != std::string::npos;
+}
+
+std::string BuildPjlResponse(const std::string& request)
+{
+    std::string body;
+
+    if (request.find("INFO STATUS") != std::string::npos)
+    {
+        body += "@PJL INFO STATUS\r\n"
+                "CODE=10001\r\n"
+                "DISPLAY=\"Ready\"\r\n"
+                "ONLINE=TRUE\r\n";
+    }
+
+    if (request.find("INFO ID") != std::string::npos)
+        body += "@PJL INFO ID\r\n\"USB-PrintServer\"\r\n";
+
+    if (request.find("USTATUS") != std::string::npos)
+    {
+        body += "@PJL USTATUS DEVICE = ON\r\n"
+                "@PJL USTATUS JOB = ON\r\n"
+                "@PJL USTATUS PAGE = OFF\r\n";
+    }
+
+    if (body.empty())
+        body = "@PJL INFO STATUS\r\nCODE=10001\r\nDISPLAY=\"Ready\"\r\n";
+
+    return std::string("\x1b%-12345X") + body + "\x0c\x1b%-12345X";
+}
+
 } // namespace
 
 TcpPrintServer::TcpPrintServer(const std::string& printerName, int port)
@@ -702,8 +759,9 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
             clientAddress = text;
         }
 
-        std::string clientName = NetworkHelper::GetHostName(clientAddress);
-        Log("收到连接: " + clientName + " (" + clientAddress + ")");
+        // 反查主机会阻塞在 DNS 上（局域网常见数秒无响应），必须放到读取之后：
+        // 否则驱动等不到响应会直接复位连接，日志里只剩「接收数据失败 10054」。
+        Log("收到连接: " + clientAddress);
 
         // 从配置读取接收超时（秒），默认 30 秒
         int timeoutSec = atoi(ConfigHelper::GetSetting("ReceiveTimeout", "30").c_str());
@@ -727,6 +785,9 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
         }
 
         std::vector<unsigned char> buffer(8192);
+        // 保留首段数据：驱动可能先发 PJL 状态查询，等回应后才发作业
+        std::vector<unsigned char> head;
+        head.reserve(8192);
         for (;;)
         {
             int bytesRead = ::recv(clientSocket, (char*)buffer.data(), (int)buffer.size(), 0);
@@ -741,27 +802,58 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
 
             DWORD written = 0;
             ::WriteFile(hFile, buffer.data(), (DWORD)bytesRead, &written, nullptr);
+            if (head.size() < 8192)
+            {
+                size_t take = (std::min)((size_t)bytesRead, 8192 - head.size());
+                head.insert(head.end(), buffer.begin(), buffer.begin() + take);
+            }
+
+            // 首段就是 PJL 查询：立刻回应，不能等连接关闭（驱动在等这条回复）
+            if (totalBytes == 0 && LooksLikePjlQuery(head))
+            {
+                const std::string firstChunk(head.begin(), head.end());
+                if (!IsRealPrintJob(firstChunk))
+                {
+                    const std::string response = BuildPjlResponse(firstChunk);
+                    ::send(clientSocket, response.data(), (int)response.size(), 0);
+                    Log("[PJL] 已回应状态查询，未当作作业打印: " + clientAddress);
+                    ::CloseHandle(hFile);
+                    ::DeleteFileW(tempFile.c_str());
+                    RemoveActiveClient(clientSocketValue);
+                    return;
+                }
+            }
             totalBytes += bytesRead;
         }
 
         ::CloseHandle(hFile);
 
-        if (readFailed)
+        if (readFailed && totalBytes == 0)
         {
-            // 与 C# 一致：读取异常时不打印；此处额外清理临时文件（C# 会残留）
+            // 驱动探测端口后直接复位连接：属于正常现象，不该当成错误刷日志
             int err = ::WSAGetLastError();
-            Log("处理客户端 " + clientAddress + " 错误: 接收数据失败 (错误 " + std::to_string(err) + ")");
+            Log("客户端 " + clientAddress + " 提前断开（错误 " + std::to_string(err) + "，未收到数据）");
             ::DeleteFileW(tempFile.c_str());
             RemoveActiveClient(clientSocketValue);
             return;
         }
 
-        Log("接收数据: " + FormatSize(totalBytes) + " 来自 " + clientName);
+        if (readFailed)
+        {
+            int err = ::WSAGetLastError();
+            Log("处理客户端 " + clientAddress + " 中断: 接收数据失败 (错误 " + std::to_string(err) +
+                ")，已收到 " + FormatSize(totalBytes) + "，放弃本作业");
+            ::DeleteFileW(tempFile.c_str());
+            RemoveActiveClient(clientSocketValue);
+            return;
+        }
+
+        Log("接收数据: " + FormatSize(totalBytes) + " 来自 " + clientAddress);
 
         // RAW 直通打印
         PrintTempFile(tempFile);
 
-        Log("打印完成: " + clientName);
+        Log("打印完成: " + clientAddress);
 
         ::DeleteFileW(tempFile.c_str());
     }

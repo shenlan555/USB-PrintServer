@@ -260,6 +260,53 @@ bool SendRawToPort(const std::string& host, int port, size_t bytes, size_t& sent
     return ok;
 }
 
+
+// 发送一段数据并读回响应（用于 PJL 状态查询自检）
+bool SendAndReceive(const std::string& host, int port, const std::string& payload, std::string& reply)
+{
+    reply.clear();
+
+    addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    addrinfo* result = nullptr;
+    const std::string portText = std::to_string(port);
+    if (::getaddrinfo(host.c_str(), portText.c_str(), &hints, &result) != 0 || result == nullptr)
+        return false;
+
+    bool ok = false;
+    SOCKET s = ::socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (s != INVALID_SOCKET)
+    {
+        DWORD timeout = 3000;
+        ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+
+        if (::connect(s, result->ai_addr, (int)result->ai_addrlen) == 0)
+        {
+            ::send(s, payload.data(), (int)payload.size(), 0);
+
+            char buffer[1024];
+            for (;;)
+            {
+                int got = ::recv(s, buffer, sizeof(buffer), 0);
+                if (got <= 0)
+                    break;
+                reply.append(buffer, got);
+                if (reply.size() > 8192)
+                    break;
+            }
+
+            ok = !reply.empty();
+        }
+        ::closesocket(s);
+    }
+
+    ::freeaddrinfo(result);
+    return ok;
+}
+
 }
 
 int RunTcpSelfTest(const std::wstring& reportPath)
@@ -754,6 +801,15 @@ int RunServiceSelfTest(const std::wstring& reportPath)
         size_t sentB = 0;
         check("打印机 B 端口已监听", SendRawToPort("127.0.0.1", testPortB, 8, sentB),
               "端口 " + std::to_string(testPortB));
+
+        // PJL 状态查询：驱动发作业前会先问状态，必须回应，否则驱动直接复位连接
+        {
+            std::string reply;
+            const std::string query = "\x1b%-12345X@PJL INFO STATUS\r\n\x1b%-12345X";
+            bool answered = SendAndReceive("127.0.0.1", testPortA, query, reply);
+            check("PJL 状态查询有回应", answered && reply.find("CODE=10001") != std::string::npos,
+                  answered ? "已回应" : "无回应");
+        }
 
         std::string body;
         int status = 0;
