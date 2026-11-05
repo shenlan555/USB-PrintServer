@@ -684,6 +684,60 @@ ProbeResult ParseProbe(const std::vector<unsigned char>& pending, SOCKET socket,
     return ProbeResult::Handled;
 }
 
+// ---------------------------------------------------------------------------
+// 作业指纹：只对「真正要打印的数据」算哈希
+//
+// 驱动重试时 PJL 头里的 JOB NAME / 时间戳会变，整包哈希每次都不一样，
+// 只按整包比对挡不住重复打印。这里跳过 ENTER LANGUAGE 之前的部分，
+// 用后面 PCL/PS 正文算指纹，重试的作业指纹一致。
+// ---------------------------------------------------------------------------
+
+unsigned long long HashJobPayload(const std::wstring& filePath)
+{
+    HANDLE hFile = ::CreateFileW(filePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+        return 0;
+
+    LARGE_INTEGER size = { 0 };
+    ::GetFileSizeEx(hFile, &size);
+
+    const long long kMaxBytes = 64LL * 1024 * 1024;
+    long long want = size.QuadPart;
+    if (want > kMaxBytes)
+        want = kMaxBytes;
+
+    std::vector<char> data((size_t)want);
+    DWORD read = 0;
+    if (want > 0)
+        ::ReadFile(hFile, data.data(), (DWORD)want, &read, nullptr);
+    ::CloseHandle(hFile);
+
+    data.resize(read);
+    if (data.empty())
+        return 0;
+
+    const std::string text(data.begin(), data.end());
+
+    size_t begin = 0;
+    const size_t marker = text.find("ENTER LANGUAGE");
+    if (marker != std::string::npos)
+    {
+        const size_t lineEnd = text.find("\r\n", marker);
+        begin = (lineEnd == std::string::npos) ? marker + 14 : lineEnd + 2;
+        if (begin > text.size())
+            begin = text.size();
+    }
+
+    unsigned long long hash = 1469598103934665603ULL;
+    for (size_t i = begin; i < text.size(); ++i)
+    {
+        hash ^= (unsigned char)text[i];
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
 } // namespace
 
 TcpPrintServer::TcpPrintServer(const std::string& printerName, int port)
@@ -956,6 +1010,20 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
             else
             {
                 writeJobBytes(buffer.data(), (size_t)bytesRead);
+
+                // 正文以 UEL 结尾 = 这份作业已经完整；短暂确认没有后续就立刻收尾打印，
+                // 不再干等 ReceiveTimeout（驱动等太久会重发，表现为重复打印）
+                if (bytesRead >= (int)kUelMagicLen &&
+                    memcmp(buffer.data() + bytesRead - kUelMagicLen, kUelMagic, kUelMagicLen) == 0)
+                {
+                    fd_set readSet;
+                    FD_ZERO(&readSet);
+                    FD_SET(clientSocket, &readSet);
+
+                    timeval wait = { 0, 400 * 1000 };
+                    if (::select(0, &readSet, nullptr, nullptr, &wait) <= 0)
+                        break;
+                }
             }
         }
 
@@ -991,21 +1059,30 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
 
         Log("接收数据: " + FormatSize(totalBytes) + " 来自 " + clientAddress);
 
-        // 同一台打印机短时间内重复收到相同作业：驱动重试，只打印一次
+        // 同一台打印机短时间内重复收到相同作业：驱动重试，只打印一次。
+        // 指纹取自正文（跳过 ENTER LANGUAGE 之前的 PJL 头），
+        // 因为重试时 JOB NAME / 时间戳会变，整包哈希挡不住。
         {
+            const unsigned long long payloadHash = HashJobPayload(tempFile);
+
             std::lock_guard<std::mutex> guard(m_jobMutex);
             const ULONGLONG now = ::GetTickCount64();
 
-            if (m_lastJobHash == jobHash && m_lastJobTick != 0 && now - m_lastJobTick < 8000)
+            if (payloadHash != 0 && m_lastJobHash == payloadHash &&
+                m_lastJobTick != 0 && now - m_lastJobTick < 30000)
             {
-                Log("重复作业（内容与上次相同）已忽略: " + clientAddress);
+                Log("重复作业（内容与上次相同，间隔 " +
+                    std::to_string(now - m_lastJobTick) + " ms）已忽略: " + clientAddress);
                 ::DeleteFileW(tempFile.c_str());
                 RemoveActiveClient(clientSocketValue);
                 return;
             }
 
-            m_lastJobHash = jobHash;
-            m_lastJobTick = now;
+            if (payloadHash != 0)
+            {
+                m_lastJobHash = payloadHash;
+                m_lastJobTick = now;
+            }
         }
 
         PrintTempFile(tempFile);

@@ -387,10 +387,15 @@ int RunTcpSelfTest(const std::wstring& reportPath)
             check("带作业头的打印数据被受理", ok || true);
         }
 
-        // 同一份作业紧接着再发一次：判为驱动重试，不应重复打印
+        // 驱动重试：PJL 头里的 JOB NAME 变了，但正文相同 → 仍判为重复
         {
+            const std::string retryJob =
+                std::string("\x1b%-12345X@PJL JOB NAME=\"selftest-retry\"\r\n"
+                            "@PJL ENTER LANGUAGE=PCL\r\n") +
+                std::string(2048, 'B');
+
             std::string reply;
-            SendTextAndReceive("127.0.0.1", port, job, reply);
+            SendTextAndReceive("127.0.0.1", port, retryJob, reply);
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
