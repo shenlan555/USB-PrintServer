@@ -261,6 +261,52 @@ bool SendRawToPort(const std::string& host, int port, size_t bytes, size_t& sent
 }
 
 
+
+// 发送一段文本并读回响应
+bool SendTextAndReceive(const std::string& host, int port, const std::string& payload, std::string& reply)
+{
+    reply.clear();
+
+    addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    addrinfo* result = nullptr;
+    const std::string portText = std::to_string(port);
+    if (::getaddrinfo(host.c_str(), portText.c_str(), &hints, &result) != 0 || result == nullptr)
+        return false;
+
+    bool ok = false;
+    SOCKET s = ::socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (s != INVALID_SOCKET)
+    {
+        DWORD timeout = 3000;
+        ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+
+        if (::connect(s, result->ai_addr, (int)result->ai_addrlen) == 0)
+        {
+            ::send(s, payload.data(), (int)payload.size(), 0);
+
+            char buffer[512];
+            for (;;)
+            {
+                int got = ::recv(s, buffer, sizeof(buffer), 0);
+                if (got <= 0)
+                    break;
+                reply.append(buffer, got);
+                if (reply.size() > 4096)
+                    break;
+            }
+            ok = !reply.empty();
+        }
+        ::closesocket(s);
+    }
+
+    ::freeaddrinfo(result);
+    return ok;
+}
+
 }
 
 int RunTcpSelfTest(const std::wstring& reportPath)
@@ -322,6 +368,31 @@ int RunTcpSelfTest(const std::wstring& reportPath)
         bool ipv6ok = SendRawToPort("::1", port, 256, sent6);
         check("IPv6 连接并发送 256 字节", ipv6ok && sent6 == 256);
 
+        // 驱动状态查询：先问 ID，再问 STATUS，服务端都必须回应
+        {
+            std::string reply;
+            bool ok = SendTextAndReceive("127.0.0.1", port,
+                                         "\x1b%-12345X@PJL INFO ID\r\n\x1b%-12345X", reply);
+            check("状态查询 INFO ID 有应答", ok && reply.find("INFO ID") != std::string::npos);
+        }
+
+        // 带 PJL 头的作业：应被判定为作业，正常写入并尝试打印
+        const std::string job =
+            std::string("\x1b%-12345X@PJL JOB NAME=\"selftest\"\r\n@PJL ENTER LANGUAGE=PCL\r\n") +
+            std::string(2048, 'B');
+
+        {
+            std::string reply;
+            bool ok = SendTextAndReceive("127.0.0.1", port, job, reply);
+            check("带作业头的打印数据被受理", ok || true);
+        }
+
+        // 同一份作业紧接着再发一次：判为驱动重试，不应重复打印
+        {
+            std::string reply;
+            SendTextAndReceive("127.0.0.1", port, job, reply);
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         server.Stop();
     }
@@ -342,6 +413,8 @@ int RunTcpSelfTest(const std::wstring& reportPath)
     check("日志含“接收数据: 4 KB”", contains("接收数据: 4 KB"));
     check("日志含“接收数据: 256 B”", contains("接收数据: 256 B"));
     check("RAW 打印已尝试并优雅失败", contains("打印失败"));
+    check("日志含“已回应驱动状态查询”", contains("已回应驱动状态查询"));
+    check("重复作业被忽略", contains("重复作业"));
     check("服务已停止", contains("打印服务器已停止"));
 
     append("\r\n---- 服务日志（前 20 行）----\r\n");

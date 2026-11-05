@@ -525,6 +525,165 @@ std::wstring UniqueTempPrnPath()
     return std::wstring(tempName) + L".prn";
 }
 
+// ---------------------------------------------------------------------------
+// 驱动状态查询（PJL）应答 + 作业判定
+//
+// HP 等驱动在发作业前会先发一条状态查询（@PJL INFO ID 之类）并等待回应，
+// 收不到回应就直接复位连接（服务端表现为 recv 10054、一个字节都没有）。
+// 这里只回应「查询类」命令；SET / JOB / ENTER LANGUAGE 属于真实作业，照常打印。
+// ---------------------------------------------------------------------------
+
+const char kUelMagic[] = "\x1B%-12345X";
+const size_t kUelMagicLen = 9;
+
+enum class ProbeResult
+{
+    NeedMore,   // 数据不足，等下一段
+    Handled,    // 已消费掉一段（查询应答 / 纯 UEL），继续解析
+    Job         // 这是作业数据
+};
+
+std::string ToUpperAscii(const std::string& text)
+{
+    std::string out = text;
+    for (char& c : out)
+    {
+        if (c >= 'a' && c <= 'z')
+            c = (char)(c - 'a' + 'A');
+    }
+    return out;
+}
+
+bool StartsWithNoCase(const std::vector<unsigned char>& buf, size_t off, const char* text)
+{
+    const size_t n = strlen(text);
+    if (buf.size() - off < n)
+        return false;
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        char a = (char)buf[off + i];
+        char b = text[i];
+        if (a >= 'a' && a <= 'z') a = (char)(a - 'a' + 'A');
+        if (b >= 'a' && b <= 'z') b = (char)(b - 'a' + 'A');
+        if (a != b)
+            return false;
+    }
+    return true;
+}
+
+bool IsPrefixOfNoCase(const std::vector<unsigned char>& buf, size_t off, const char* text)
+{
+    const size_t n = strlen(text);
+    if (buf.size() - off >= n)
+        return false;
+
+    for (size_t i = 0; off + i < buf.size(); ++i)
+    {
+        char a = (char)buf[off + i];
+        char b = text[i];
+        if (a >= 'a' && a <= 'z') a = (char)(a - 'a' + 'A');
+        if (b >= 'a' && b <= 'z') b = (char)(b - 'a' + 'A');
+        if (a != b)
+            return false;
+    }
+    return true;
+}
+
+bool FindCrlf(const std::vector<unsigned char>& buf, size_t off, size_t& pos)
+{
+    for (size_t i = off; i + 1 < buf.size(); ++i)
+    {
+        if (buf[i] == '\r' && buf[i + 1] == '\n')
+        {
+            pos = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+// 返回空串表示这不是查询命令（应视为作业数据）
+std::string BuildProbeReply(const std::string& command, const std::string& printerName)
+{
+    const std::string upper = ToUpperAscii(command);
+    std::string body;
+
+    if (upper.rfind("INFO ID", 0) == 0)
+        body = "INFO ID\r\n\"" + printerName + "\"";
+    else if (upper.rfind("INFO STATUS", 0) == 0)
+        body = "INFO STATUS\r\nCODE=10001\r\nDISPLAY=\"Ready\"\r\nONLINE=TRUE";
+    else if (upper.rfind("INFO CONFIG", 0) == 0)
+        body = "INFO CONFIG\r\nLANGUAGE=PCL";
+    else if (upper.rfind("USTATUS", 0) == 0)
+        body = "USTATUS DEVICE=ON\r\nUSTATUS JOB=ON";
+    else if (upper.rfind("ECHO", 0) == 0)
+        body = command;
+    else if (upper.rfind("INQUIRE", 0) == 0)
+        body = "INQUIRE";
+    else
+        return std::string();
+
+    return std::string(kUelMagic) + "@PJL " + body + "\r\n" + kUelMagic;
+}
+
+// 解析缓冲区头部：查询则回包并消费，作业则原样交给调用方
+ProbeResult ParseProbe(const std::vector<unsigned char>& pending, SOCKET socket,
+                       const std::string& printerName, size_t& consumed, bool& replied)
+{
+    consumed = 0;
+    replied = false;
+    size_t off = 0;
+
+    for (;;)
+    {
+        if (pending.size() - off >= kUelMagicLen &&
+            memcmp(pending.data() + off, kUelMagic, kUelMagicLen) == 0)
+        {
+            off += kUelMagicLen;
+            consumed = off;
+            continue;
+        }
+
+        // 可能是 UEL 的开头，等更多数据
+        if (pending.size() - off < kUelMagicLen &&
+            memcmp(pending.data() + off, kUelMagic, pending.size() - off) == 0)
+        {
+            return ProbeResult::NeedMore;
+        }
+        break;
+    }
+
+    if (off >= pending.size())
+        return (off > 0) ? ProbeResult::Handled : ProbeResult::NeedMore;
+
+    if (!StartsWithNoCase(pending, off, "@PJL"))
+        return IsPrefixOfNoCase(pending, off, "@PJL") ? ProbeResult::NeedMore : ProbeResult::Job;
+
+    size_t crlf = 0;
+    if (!FindCrlf(pending, off, crlf))
+    {
+        if (pending.size() - off > 1024)
+            return ProbeResult::Job;
+        return ProbeResult::NeedMore;
+    }
+
+    const std::string line((const char*)pending.data() + off + 4,
+                           crlf - (off + 4));      // 去掉 "@PJL"
+    const size_t first = line.find_first_not_of(" \t");
+    if (first == std::string::npos)
+        return ProbeResult::Job;
+
+    const std::string reply = BuildProbeReply(line.substr(first), printerName);
+    if (reply.empty())
+        return ProbeResult::Job;                    // SET / JOB / ENTER LANGUAGE
+
+    ::send(socket, reply.data(), (int)reply.size(), 0);
+    replied = true;
+    consumed = crlf + 2;
+    return ProbeResult::Handled;
+}
+
 } // namespace
 
 TcpPrintServer::TcpPrintServer(const std::string& printerName, int port)
@@ -709,11 +868,8 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
             peerPort = ::ntohs(rawPort);
         }
 
-        // 反查主机会阻塞在 DNS 上（局域网常见数秒无响应），必须放到读取之后：
-        // 否则驱动等不到响应会直接复位连接，日志里只剩「接收数据失败 10054」。
         Log("收到连接: " + clientAddress + ":" + std::to_string(peerPort));
 
-        // 从配置读取接收超时（秒），默认 30 秒
         int timeoutSec = atoi(ConfigHelper::GetSetting("ReceiveTimeout", "30").c_str());
         if (timeoutSec <= 0)
             timeoutSec = 30;
@@ -734,6 +890,27 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
             return;
         }
 
+        // 作业内容哈希：用于识别驱动重试造成的重复打印
+        unsigned long long jobHash = 1469598103934665603ULL;
+
+        auto writeJobBytes = [&](const unsigned char* data, size_t length) {
+            if (length == 0)
+                return;
+
+            DWORD written = 0;
+            ::WriteFile(hFile, data, (DWORD)length, &written, nullptr);
+            totalBytes += (long long)length;
+
+            for (size_t i = 0; i < length; ++i)
+            {
+                jobHash ^= data[i];
+                jobHash *= 1099511628211ULL;
+            }
+        };
+
+        std::vector<unsigned char> pending;   // 尚未判定为作业的头部数据
+        bool jobStarted = false;
+
         std::vector<unsigned char> buffer(8192);
         for (;;)
         {
@@ -747,20 +924,47 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
                 break;
             }
 
-            DWORD written = 0;
-            ::WriteFile(hFile, buffer.data(), (DWORD)bytesRead, &written, nullptr);
-            totalBytes += bytesRead;
+            if (!jobStarted)
+            {
+                pending.insert(pending.end(), buffer.begin(), buffer.begin() + bytesRead);
+
+                for (;;)
+                {
+                    size_t consumed = 0;
+                    bool replied = false;
+                    const ProbeResult result = ParseProbe(pending, clientSocket, m_printerName, consumed, replied);
+
+                    if (replied)
+                        Log("已回应驱动状态查询: " + clientAddress + ":" + std::to_string(peerPort));
+
+                    if (result == ProbeResult::NeedMore)
+                        break;
+
+                    if (result == ProbeResult::Job)
+                    {
+                        jobStarted = true;
+                        writeJobBytes(pending.data(), pending.size());
+                        pending.clear();
+                        break;
+                    }
+
+                    pending.erase(pending.begin(), pending.begin() + consumed);
+                    if (pending.empty())
+                        break;
+                }
+            }
+            else
+            {
+                writeJobBytes(buffer.data(), (size_t)bytesRead);
+            }
         }
 
         ::CloseHandle(hFile);
 
-        if (readFailed && totalBytes == 0)
+        if (totalBytes == 0)
         {
-            // 驱动探测端口后直接复位连接：属于正常现象，不该当成错误刷日志
-            int err = ::WSAGetLastError();
-            Log("客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 提前断开（错误 " +
-                std::to_string(err) + "，未收到数据，" +
-                std::to_string(::GetTickCount64() - startedAt) + " ms）");
+            // 只做了状态查询、没有作业数据：不打印，也不刷错误日志
+            Log("连接 " + clientAddress + ":" + std::to_string(peerPort) + " 仅查询状态，无打印数据");
             ::DeleteFileW(tempFile.c_str());
             RemoveActiveClient(clientSocketValue);
             return;
@@ -769,17 +973,41 @@ void TcpPrintServer::HandleClient(uintptr_t clientSocketValue)
         if (readFailed)
         {
             int err = ::WSAGetLastError();
-            Log("处理客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 中断: 接收数据失败 (错误 " +
-                std::to_string(err) + ")，已收到 " + FormatSize(totalBytes) + "，" +
-                std::to_string(::GetTickCount64() - startedAt) + " ms，放弃本作业");
-            ::DeleteFileW(tempFile.c_str());
-            RemoveActiveClient(clientSocketValue);
-            return;
+
+            if (!jobStarted)
+            {
+                Log("客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 提前断开（错误 " +
+                    std::to_string(err) + "，未收到完整数据，" +
+                    std::to_string(::GetTickCount64() - startedAt) + " ms）");
+                ::DeleteFileW(tempFile.c_str());
+                RemoveActiveClient(clientSocketValue);
+                return;
+            }
+
+            // 作业已开始传输后对端复位：按已收到的数据继续打印（部分驱动发完就断）
+            Log("客户端 " + clientAddress + ":" + std::to_string(peerPort) + " 传输中断 (错误 " +
+                std::to_string(err) + ")，已收到 " + FormatSize(totalBytes) + "，继续打印");
         }
 
         Log("接收数据: " + FormatSize(totalBytes) + " 来自 " + clientAddress);
 
-        // RAW 直通打印
+        // 同一台打印机短时间内重复收到相同作业：驱动重试，只打印一次
+        {
+            std::lock_guard<std::mutex> guard(m_jobMutex);
+            const ULONGLONG now = ::GetTickCount64();
+
+            if (m_lastJobHash == jobHash && m_lastJobTick != 0 && now - m_lastJobTick < 8000)
+            {
+                Log("重复作业（内容与上次相同）已忽略: " + clientAddress);
+                ::DeleteFileW(tempFile.c_str());
+                RemoveActiveClient(clientSocketValue);
+                return;
+            }
+
+            m_lastJobHash = jobHash;
+            m_lastJobTick = now;
+        }
+
         PrintTempFile(tempFile);
 
         Log("打印完成: " + clientAddress);

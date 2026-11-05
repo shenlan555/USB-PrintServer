@@ -115,6 +115,11 @@ private:
 
     std::mutex m_clientsMutex;
     std::vector<uintptr_t> m_activeClients;
+
+    // 作业去重：驱动重试时短时间内会重复发送同一份作业
+    std::mutex m_jobMutex;
+    unsigned long long m_lastJobHash = 0;
+    unsigned long long m_lastJobTick = 0;
 };
 
 // 发送 UTF-8 消息到 Windows 事件日志（对应 C# EventLog 写入 Application 日志）
